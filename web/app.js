@@ -33,7 +33,7 @@ const kmCell=(D,x,y)=>String.fromCharCode(65+Math.floor((x+D.W)/KM))+(Math.floor
    1956: Vuelo Americano Serie B, cut into our own tiles aligned to the map frame (scripts/ortho1956.py):
          level L = 0.5*2^L m/px, 512 px tiles, column from the west edge, row from the south edge.
    hoy:  PNOA, IGN's pre-rendered Web Mercator tiles (fast, cached at IGN), placed by their corner coordinates. */
-const T56={res:.5,tile:512,top:4,url:(L,c,r)=>`tiles/1956/${L}/${c}_${r}.jpg`};
+const T56={res:.5,tile:512,top:4,pad:2048,url:(L,c,r)=>`tiles/1956/${L}/${c}_${r}.jpg`};
 const PNOA=(z,x,y)=>`https://www.ign.es/wmts/pnoa-ma?service=WMTS&request=GetTile&version=1.0.0&layer=OI.OrthoimageCoverage&style=default&tilematrixset=GoogleMapsCompatible&tilematrix=${z}&tilerow=${y}&tilecol=${x}&format=image/jpeg`;
 const toLL=(D,x,y)=>[D.origin[0]+x/(111320*Math.cos(D.origin[1]*Math.PI/180)),D.origin[1]+y/110574];
 const imgs=new Map();
@@ -46,7 +46,7 @@ function paintOrtho(c,D,b,which,pw,ph){
   const need=b.w/pw,xa=b.x0,xb=b.x0+b.w,ya=b.y0,yb=b.y0+b.h; // metres per pixel wanted
   if(which==='before'){
     const L=Math.max(0,Math.min(T56.top,Math.floor(Math.log2(need/T56.res)))),T=T56.tile*T56.res*2**L;
-    for(let cc=Math.max(0,Math.floor((xa+D.W)/T));cc*T-D.W<xb&&cc*T<=2*D.W;cc++)for(let rr=Math.max(0,Math.floor((ya+D.H)/T));rr*T-D.H<yb&&rr*T<=2*D.H;rr++)
+    const P=T56.pad;for(let cc=Math.floor((Math.max(xa,-D.W-P)+D.W)/T);cc*T-D.W<Math.min(xb,D.W+P);cc++)for(let rr=Math.floor((Math.max(ya,-D.H-P)+D.H)/T);rr*T-D.H<Math.min(yb,D.H+P);rr++)
       put(T56.url(L,cc,rr),cc*T-D.W,rr*T-D.H,(cc+1)*T-D.W,(rr+1)*T-D.H);
   }else{
     const lat0=D.origin[1]*Math.PI/180,z=Math.max(10,Math.min(19,Math.ceil(Math.log2(156543.034*Math.cos(lat0)/need)))),n=2**z;
@@ -65,18 +65,19 @@ function Ortho({D,b,which,size,cls}){
 
 /* ---------- the archive: cases ----------
    A case is one geolocated record: exact (a point) or approximate (a point and a radius r in metres), holding any number of items:
-   pair {before,after} · photo {src,label} · text {body,label} · audio {src,label} · file {src,label}. Source: data/cases.json.
+   versions {photos:[{src,label}...]} · photo {src,label} · text {body,label} · audio {src,label} · file {src,label}. Source: data/cases.json.
    Cases you add live in this browser (IndexedDB). */
-const KIND={pair:'photo',photo:'photo',text:'text',audio:'audio',file:'file'},NOUN={photo:['photo','photos'],text:['text','texts'],audio:['audio','audio'],file:['file','files']};
-const inventory=c=>{const k={};for(const it of c.items){const t=KIND[it.type];if(t)k[t]=(k[t]||0)+(it.type==='pair'?2:1)}
+const KIND={versions:'photo',photo:'photo',text:'text',audio:'audio',file:'file'},NOUN={photo:['photo','photos'],text:['text','texts'],audio:['audio','audio'],file:['file','files']};
+const inventory=c=>{const k={};for(const it of c.items){const t=KIND[it.type];if(t)k[t]=(k[t]||0)+(it.type==='versions'?it.photos.length:1)}
   return ['photo','audio','text','file'].filter(t=>k[t]).map(t=>k[t]+' '+NOUN[t][k[t]>1?1:0]).join(' · ')};
-const leadIndex=c=>{for(const t of ['pair','photo','audio','text','file']){const i=c.items.findIndex(it=>it.type===t);if(i>=0)return i}return 0};
+const leadIndex=c=>{for(const t of ['versions','photo','audio','text','file']){const i=c.items.findIndex(it=>it.type===t);if(i>=0)return i}return 0};
 const catNo=c=>'Nº '+String(c.n).padStart(3,'0');
 const where=c=>c.r?'approx. ±'+c.r+' m':'exact location';
-const itemName=it=>it.type==='pair'?it.before.label+' / '+it.after.label:it.label||(it.type==='text'?it.body.slice(0,40):it.type==='photo'?'Photo':it.src.split('/').pop());
+const itemName=it=>it.type==='versions'?'Versions '+it.photos.map(p=>p.v).join(' · '):it.label||(it.type==='text'?it.body.slice(0,40):it.type==='photo'?'Photo':it.src.split('/').pop());
 const ext=s=>(s.split('.').pop()||'').toLowerCase();
 // cases saved by an earlier version of this page were single photos {id,title,x,y,before?,after}
-const fromLegacy=p=>p.items?p:{id:p.id,title:p.title,x:p.x,y:p.y,items:[p.before?{type:'pair',before:p.before,after:p.after}:{type:'photo',...p.after}]};
+const fromLegacy=p=>p.items?p:{id:p.id,title:p.title,x:p.x,y:p.y,items:[p.before?{type:'versions',photos:[{...p.before,v:'a'},{...p.after,v:'b'}]}:{type:'photo',...p.after}]};
+const firstSrc=it=>it.type==='versions'?it.photos[0].src:it.type==='photo'?it.src:null;
 
 const idb=()=>new Promise((res,rej)=>{try{const q=indexedDB.open('lnu-photos-v2',1);q.onupgradeneeded=()=>q.result.createObjectStore('p');q.onsuccess=()=>res(q.result);q.onerror=()=>rej(q.error)}catch(e){rej(e)}});
 async function dbAll(){try{const d=await idb();return await new Promise(res=>{const out={},c=d.transaction('p').objectStore('p').openCursor();c.onsuccess=()=>{const k=c.result;if(k){out[k.key]=k.value;k.continue()}else res(out)};c.onerror=()=>res(out)})}catch(e){return{}}}
@@ -102,6 +103,10 @@ function equalize(src){let q=eqCache.get(src);if(q)return q;
 function Pic({src,eq,cls,alt}){const [out,setOut]=useState(null);
   useEffect(()=>{let live=true;setOut(null);if(eq)equalize(src).then(u=>live&&setOut(u));return()=>{live=false}},[src,eq]);
   return html`<img src=${eq&&out?out:src} class=${cls} alt=${alt||''} draggable="false"/>`}
+// a card's versions: the first shows; while the card is lit they take turns, cross-fading
+function Cycle({photos,eq,on}){const [k,setK]=useState(0);
+  useEffect(()=>{if(!on){setK(0);return}setK(1%photos.length);const iv=setInterval(()=>setK(x=>(x+1)%photos.length),1300);return()=>clearInterval(iv)},[on,photos.length]);
+  return photos.map((p,i)=>html`<${Pic} key=${p.src} cls=${'v'+(i===k?' on':'')} src=${p.src} eq=${eq}/>`)}
 
 /* sound: one plays at a time; the waveform is the file's own, decoded once */
 const peaksCache=new Map();let playing=null;
@@ -134,10 +139,10 @@ const hash=s=>{let h=2166136261;for(let i=0;i<s.length;i++)h=Math.imul(h^s.charC
    A card takes w x h grid squares chosen from its content, inset by a small gutter. Each is packed near its anchor square,
    outside a blocked zone, nearest first and spread round the compass (a card in a crowded direction costs more). */
 const aspects=new Map(); // photo src -> width/height, filled as images load
-const preloadAspects=(cases,done)=>{for(const c of Object.values(cases))for(const it of c.items){const src=it.type==='pair'?it.after.src:it.type==='photo'?it.src:null;
+const preloadAspects=(cases,done)=>{for(const c of Object.values(cases))for(const it of c.items){const src=firstSrc(it);
   if(src&&!aspects.has(src)){aspects.set(src,null);getImg(src).then(im=>{aspects.set(src,im?im.naturalWidth/im.naturalHeight:1.33);done()})}}};
 function shapes(it,big){
-  if(it.type==='pair'||it.type==='photo'){const r=aspects.get(it.type==='pair'?it.after.src:it.src)||1.33;
+  if(firstSrc(it)){const r=aspects.get(firstSrc(it))||1.33;
     if(r>=1.2)return big?[[3,2],[2,1],[1,1]]:[[2,1],[1,1]];
     if(r<=.83)return big?[[2,3],[1,2],[1,1]]:[[1,2],[1,1]];
     return big?[[2,2],[1,1]]:[[1,1]]}
@@ -316,8 +321,8 @@ function MapView({D,layers,cases,placing,onPlace,onOpen,paused,shuffle,children}
       <div class="mark"></div><span class="count" style=${{fontSize:Math.max(15,Math.min(40,z*.24))}} aria-label=${n+(n>1?' cases':' case')}>${n}</span>
       ${isPin&&html`<span class="corners" aria-hidden="true"><i></i><i></i><i></i><i></i></span>`}
       ${on&&html`<div class="tab">${kmCell(D,g.x0+g.size/2,g.y0+g.size/2)} · ${n} ${n>1?'cases':'case'} <i>· ${isPin?'click to open':'click to pin'}</i></div>`}</div>`};
-  const media=(c,it)=>{const snd=it.type!=='audio'&&c.items.find(x=>x.type==='audio');
-    return it.type==='pair'||it.type==='photo'?html`<div class="media"><${Pic} src=${it.type==='pair'?it.before.src:it.src} eq=${layers.bw}/>${it.type==='pair'&&html`<${Pic} cls="after" src=${it.after.src} eq=${layers.bw}/>`}${snd&&html`<${Sound} src=${snd.src} label=${snd.label} variant="dot"/>`}</div>`
+  const media=(c,it,on)=>{const snd=it.type!=='audio'&&c.items.find(x=>x.type==='audio');
+    return firstSrc(it)?html`<div class="media">${it.type==='versions'?html`<${Cycle} photos=${it.photos} eq=${layers.bw} on=${on}/>`:html`<${Pic} src=${it.src} eq=${layers.bw}/>`}${snd&&html`<${Sound} src=${snd.src} label=${snd.label} variant="dot"/>`}</div>`
       :it.type==='audio'?html`<div class="media snd"><${Sound} src=${it.src} label=${it.label} variant="mini"/></div>`
       :it.type==='text'?html`<div class="media txt"><p>${it.body}</p></div>`
       :html`<div class="media file"><b>▤</b>${ext(it.src)}</div>`};
@@ -325,7 +330,7 @@ function MapView({D,layers,cases,placing,onPlace,onOpen,paused,shuffle,children}
     return html`<div key=${r.key} data-id=${c.id} data-item=${item} class=${'card '+cls+(lit===r.key?' lit':'')} style=${{left:r.left,top:r.top,width:r.W,height:r.H,'--d':d+'s'}}
         role="button" tabIndex="0" aria-label=${catNo(c)+', '+c.title+', '+label} onPointerEnter=${()=>setLit(r.key)} onPointerLeave=${()=>setLit(null)}
         onFocus=${()=>setLit(r.key)} onBlur=${()=>setLit(null)} onKeyDown=${e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();e.stopPropagation();openItem(c.id,item,e.currentTarget)}}}>
-      <div class="sheet">${media(c,it)}</div><span class="lab"><i>${catNo(c)}</i>${c.title}</span></div>`};
+      <div class="sheet">${media(c,it,lit===r.key)}</div><span class="lab"><i>${catNo(c)}</i>${c.title}</span></div>`};
   const FR=F&&rect(F);
   return html`<div ref=${box} class=${'map'+(drag.current?' drag':'')+(placing?' placing':hover||pin?' over':'')+(layers.ortho?' orthomap':'')+(focus?' focus':'')} onPointerDown=${down} onPointerMove=${move} onPointerUp=${up}
       onPointerLeave=${()=>{setHover(null);setPtr(null)}} onDragOver=${e=>e.preventDefault()} onDrop=${drop}>
@@ -386,17 +391,20 @@ function LensMap({D,cases,tile,sel}){
       <label class="chip">Lens ${rad>=1000?(rad/1000).toFixed(1)+' km':rad+' m'}<input type="range" min="40" max="1200" step="10" value=${rad} onInput=${e=>setRad(+e.target.value)} onPointerDown=${e=>e.stopPropagation()}/></label>
       <span class="chip src">Vuelo Americano Serie B 1956–57 and PNOA · © IGN, CC BY 4.0</span></div></div>`}
 
-// one item on the stage: a photo (a pair with its slider), a text, a sound or a file
+// one item on the stage: a photo, its versions (compared with a slider), a text, a sound or a file
 function Viewer({c,it,eq}){
-  const [w,setW]=useState(50),fr=useRef();
+  const [w,setW]=useState(50),[cmp,setCmp]=useState([0,1]),fr=useRef();
   const set=e=>{const b=fr.current.getBoundingClientRect();setW(Math.max(0,Math.min(100,(e.clientX-b.left)/b.width*100)))};
-  useEffect(()=>setW(50),[it]);
+  useEffect(()=>{setW(50);setCmp([0,1])},[it]);
   const cap=html`<figcaption>${catNo(c)} · ${c.title}</figcaption>`;
-  if(it.type==='pair')return html`<figure class="viewer" key=${it.after.src}>${cap}<div class="pic pair" ref=${fr} style=${{'--w':w+'%'}}
+  if(it.type==='versions'){const P=it.photos,[l,r]=cmp,L=P[l],R=P[r],pairs=[];
+    for(let i=0;i<P.length;i++)for(let j=i+1;j<P.length;j++)pairs.push([i,j]);
+    return html`<figure class="viewer" key=${P[0].src}>${cap}<div class="pic pair" ref=${fr} style=${{'--w':w+'%'}}
       onPointerDown=${e=>{e.currentTarget.setPointerCapture(e.pointerId);set(e)}} onPointerMove=${e=>{if(e.buttons)set(e)}}
-      role="slider" tabIndex="0" aria-label="Before and after" aria-valuenow=${Math.round(w)} aria-valuemin="0" aria-valuemax="100" onKeyDown=${e=>{if(e.key==='ArrowLeft'||e.key==='ArrowRight'){e.stopPropagation();setW(x=>Math.max(0,Math.min(100,x+(e.key==='ArrowLeft'?-5:5))))}}}>
-    <${Pic} src=${it.after.src} eq=${eq} alt=${c.title+', '+it.after.label}/><${Pic} cls="bf" src=${it.before.src} eq=${eq} alt=${c.title+', '+it.before.label}/>
-    <i class="seam"></i><span class="knob" aria-hidden="true">↔</span><span class="tag" style=${{left:10}}>${it.before.label}</span><span class="tag" style=${{right:10}}>${it.after.label}</span></div></figure>`;
+      role="slider" tabIndex="0" aria-label=${'Compare versions '+L.v+' and '+R.v} aria-valuenow=${Math.round(w)} aria-valuemin="0" aria-valuemax="100" onKeyDown=${e=>{if(e.key==='ArrowLeft'||e.key==='ArrowRight'){e.stopPropagation();setW(x=>Math.max(0,Math.min(100,x+(e.key==='ArrowLeft'?-5:5))))}}}>
+    <${Pic} src=${R.src} eq=${eq} alt=${c.title+', '+R.label}/><${Pic} cls="bf" src=${L.src} eq=${eq} alt=${c.title+', '+L.label}/>
+    <i class="seam"></i><span class="knob" aria-hidden="true">↔</span><span class="tag" style=${{left:10}}>${L.v} · ${L.label}</span><span class="tag" style=${{right:10}}>${R.v} · ${R.label}</span></div>
+    ${pairs.length>1&&html`<div class="cmp">${pairs.map(([i,j])=>html`<button key=${i+'-'+j} aria-pressed=${i===l&&j===r} onClick=${()=>setCmp([i,j])}>${P[i].v} ↔ ${P[j].v}</button>`)}</div>`}</figure>`}
   if(it.type==='photo')return html`<figure class="viewer" key=${it.src}>${cap}<div class="pic"><${Pic} src=${it.src} eq=${eq} alt=${c.title+(it.label?', '+it.label:'')}/>${it.label&&html`<span class="tag" style=${{right:10}}>${it.label}</span>`}</div></figure>`;
   if(it.type==='text')return html`<figure class="viewer" key=${it.body}>${cap}<blockquote class="text"><small>${it.label||'Text'}</small>${it.body}</blockquote></figure>`;
   if(it.type==='audio')return html`<figure class="viewer" key=${it.src}>${cap}<div class="aud"><${Sound} src=${it.src} label=${it.label} variant="big"/><p>${it.label}</p></div></figure>`;
@@ -415,7 +423,7 @@ function Explore({D,cases,open,eq,onClose,onAdd,onRemove}){
     addEventListener('keydown',h);return()=>removeEventListener('keydown',h)});
   useEffect(()=>{const r=root.current&&root.current.querySelector('.row.sel');r&&r.scrollIntoView({block:'nearest'})},[sel]);
   const b=document.querySelector('.app').getBoundingClientRect(),f=open.from;
-  const thumb=it=>it.type==='pair'||it.type==='photo'?html`<span class="th"><${Pic} src=${it.type==='pair'?it.before.src:it.src} eq=${eq}/></span>`:html`<span class="th">${{text:'¶',audio:'♪',file:'▤'}[it.type]}</span>`;
+  const thumb=it=>firstSrc(it)?html`<span class="th"><${Pic} src=${firstSrc(it)} eq=${eq}/></span>`:html`<span class="th">${{text:'¶',audio:'♪',file:'▤'}[it.type]}</span>`;
   const nf=cs.reduce((a,c)=>a+c.items.length,0);
   return html`<div ref=${root} class=${'explore'+(shown?' open':'')} role="dialog" aria-modal="true" aria-label=${'Square '+kmCell(D,tile.x0+tile.size/2,tile.y0+tile.size/2)}
       style=${{'--from':`inset(${f.top}px ${b.width-f.left-f.width}px ${b.height-f.top-f.height}px ${f.left}px)`}}>
@@ -429,7 +437,7 @@ function Explore({D,cases,open,eq,onClose,onAdd,onRemove}){
       <button class=${'row'+(!it?' sel':'')} onClick=${()=>setSel(s=>({...s,item:null}))}><span class="th">◐</span><span>Orthophoto<br/><em>hoy, 1956 in the lens</em></span></button>
       ${cs.map(c=>html`<section key=${c.id} class=${c.id===sel.id?'cur':''}>
         <button class="ch" onClick=${()=>setSel({id:c.id,item:null})}><span class="no">${catNo(c)}</span><b>${c.title}</b><small>${[c.sample&&'sample',c.date,where(c)].filter(Boolean).join(' · ')}</small></button>
-        ${c.items.map((x,i)=>html`<button key=${i} class=${'row'+(c.id===sel.id&&i===sel.item?' sel':'')} onClick=${()=>setSel({id:c.id,item:i})}>${thumb(x)}<span>${itemName(x)}<br/><em>${x.type==='pair'?'before / after':x.type}</em></span></button>`)}
+        ${c.items.map((x,i)=>html`<button key=${i} class=${'row'+(c.id===sel.id&&i===sel.item?' sel':'')} onClick=${()=>setSel({id:c.id,item:i})}>${thumb(x)}<span>${itemName(x)}<br/><em>${x.type==='versions'?x.photos.length+' versions':x.type}</em></span></button>`)}
         ${c.own&&html`<div class="own"><button onClick=${()=>onAdd(c.id)}>Add photo</button><button onClick=${()=>{onRemove(c.id);if(cs.length<2)close()}}>Remove case</button></div>`}
       </section>`)}
       <p class="src">Drag to move, scroll to zoom, ↑ ↓ to step through the files, Esc to go back.</p>

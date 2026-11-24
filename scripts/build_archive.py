@@ -66,7 +66,7 @@ COORD = re.compile(r'^\s*(-?\d+(?:\.\d+)?)\s*[,;\s]\s*(-?\d+(?:\.\d+)?)\s*$')
 LONG_TEXT = 90                       # descriptions longer than this also become a text item
 NOTE = ('Archive cases, built from db/archivo_fotografias.xlsx by scripts/build_archive.py: do not edit by hand. '
         'Each case is geolocated: exact (lon/lat) or approximate (lon/lat + r in metres). '
-        'Items: pair {before,after}, photo {src,label}, text {body,label}, audio {src,label}, file {src,label}.')
+        'Items: versions {photos:[{src,label,v}...]} (one photo in several versions), photo {src,label}, text {body,label}, audio {src,label}, file {src,label}.')
 COLUMNS = {'id': 'identificador', 'version': 'version', 'year': 'ano', 'name': 'nombre imagen', 'source': 'archivo',
            'place': 'localizacion', 'coord': 'coordenada', 'link': 'enlaces', 'radius': 'radio (m)'}
 REQUIRED = ('id', 'name')
@@ -279,6 +279,9 @@ def build_cases(rows, photos, rep, gps=None, approx=None):
                 descriptions.append(name)
         title = next((text(r.get('place')) for r in rs if text(r.get('place'))), '') or text(rs[0]['name'])
         title = title[:1].upper() + title[1:]
+        if len(items) > 1:                                              # the versions of one photo, linked
+            items = [{'type': 'versions', 'photos': [{k: x for k, x in it.items() if k != 'type'} | {'v': it['_v']}
+                                                     for it in items]}]
         body = [d for d in descriptions if len(d) > LONG_TEXT or d.lower() != title.lower()]
         if body and any(len(d) > LONG_TEXT for d in body):
             items.append({'type': 'text', 'label': 'Descripción', 'body': ' · '.join(body)})
@@ -348,10 +351,10 @@ def main():
     for c in cases:
         del c['_where']
         for it in c['items']:
-            if it['type'] == 'photo':
-                rel = f'fotos/{c["n"]}-{it.pop("_v")}.jpg'
-                export_photo(it['src'], rel)
-                it['src'] = 'media/' + rel
+            for ph in it['photos'] if it['type'] == 'versions' else [it] if it['type'] == 'photo' else []:
+                rel = f'fotos/{c["n"]}-{ph.pop("_v")}.jpg'
+                export_photo(ph['src'], rel)
+                ph['src'] = 'media/' + rel
     os.makedirs(os.path.dirname(OUT_JSON), exist_ok=True)
     with open(OUT_JSON, 'w') as f:
         json.dump({'note': NOTE, 'cases': cases}, f, ensure_ascii=False, indent=1)

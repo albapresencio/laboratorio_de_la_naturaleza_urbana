@@ -34,6 +34,8 @@ python3 -m venv .venv
 1. Add a row per photo to `db/archivo_fotografias.xlsx`: Identificador, Versión (a, b, c…), Año, Nombre imagen,
    Archivo (source), Localización, Coordenada, Enlaces. The first Localización of a case is its title on the map.
 2. Save the photo in `db/fotografias/` as `<Identificador>-<versión>.jpg` (e.g. `6-c.jpg`); text after it is ignored.
+   The versions of a case are linked: on the map they take turns on the card, and the viewer compares any two
+   with a slider.
 3. **Coordenada** puts the case on the map: `lat, lon` as Google Maps copies it (right-click a place → copy
    `40.43436, -3.63828`). Without one, a case uses the GPS of its photos if they had any (below);
    otherwise it is listed as a warning and left off the map.
