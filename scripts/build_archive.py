@@ -5,8 +5,9 @@ both and writes what the map reads:
   web/data/cases.json      the cases that have a coordinate inside the map frame, with their photos
   web/media/fotos/         those photos as web JPEGs: at most MAX_PX on the longest side, metadata (GPS) removed
 
-usage: python scripts/build_archive.py            validate and build
-       python scripts/build_archive.py --check    validate only
+usage: python scripts/build_archive.py                  validate and build
+       python scripts/build_archive.py --check          validate only
+       python scripts/build_archive.py --extract-gps    first read GPS from new photos (see below)
 Exits with status 1 on errors (nothing is written). Warnings (a case without a coordinate yet, a photo
 without a row...) are listed but do not stop the build.
 
@@ -23,12 +24,20 @@ its photos apart. Rows without Identificador (e.g. research links in "Enlaces we
   Enlaces         link to the original (Drive)
 Photos: db/fotografias/<Identificador>-<versión>.<ext>, or <Identificador>.<ext> for a single version;
 anything after that is ignored (2-Parque-Marques-de-Suanzes.jpg is case 2, version a).
+
+Coordinates from photo metadata (--extract-gps): the GPS of each photo in db/fotografias is read, kept in
+db/coordenadas_metadatos.csv, and then removed from the photo (losslessly) so nobody's location is published.
+A point shared by photos of different cases is discarded: it is where old photos were re-photographed, not
+the place. A case without Coordenada uses the first metadata point of its photos.
 """
 import argparse
+import csv
 import json
+import math
 import os
 import re
 import shutil
+import struct
 import sys
 import unicodedata
 
@@ -41,6 +50,8 @@ from frame import inside, proj
 ROOT = os.path.normpath(os.path.join(os.path.dirname(os.path.abspath(__file__)), '..'))
 XLSX = os.path.join(ROOT, 'db', 'archivo_fotografias.xlsx')
 PHOTOS = os.path.join(ROOT, 'db', 'fotografias')
+GPS_CSV = os.path.join(ROOT, 'db', 'coordenadas_metadatos.csv')
+SAME_SPOT_M = 30                     # GPS points closer than this in different cases: a re-photographing spot
 OUT_JSON = os.path.join(ROOT, 'web', 'data', 'cases.json')
 OUT_MEDIA = os.path.join(ROOT, 'web', 'media')
 MAX_PX = 2000
@@ -131,7 +142,80 @@ def parse_coord(rec, rep):
     return lat, lon
 
 
-def build_cases(rows, photos, rep):
+def read_gps(path):
+    """(lat, lon) from a photo's EXIF, or None."""
+    try:
+        with Image.open(path) as im:
+            g = im.getexif().get_ifd(0x8825)
+        dms = lambda v: float(v[0]) + float(v[1]) / 60 + float(v[2]) / 3600
+        lat, lon = dms(g[2]), dms(g[4])
+        return (-lat if g.get(1) == 'S' else lat, -lon if g.get(3) == 'W' else lon)
+    except Exception:
+        return None
+
+
+def strip_exif(path):
+    """Drop the EXIF segment of a JPEG without re-encoding it (image data untouched)."""
+    with open(path, 'rb') as f:
+        b = f.read()
+    if b[:2] != b'\xff\xd8':
+        return False
+    out, i = bytearray(b[:2]), 2
+    while i + 4 <= len(b) and b[i] == 0xff:
+        m = b[i + 1]
+        if m == 0xda:                                                   # start of scan: the rest is image data
+            break
+        n = struct.unpack('>H', b[i + 2:i + 4])[0]
+        if not (m == 0xe1 and b[i + 4:i + 10] == b'Exif\0\0'):
+            out += b[i:i + 2 + n]
+        i += 2 + n
+    out += b[i:]
+    with open(path, 'wb') as f:
+        f.write(out)
+    return True
+
+
+def metres(a, b):
+    return math.hypot((a[0] - b[0]) * 110574, (a[1] - b[1]) * 111320 * math.cos(math.radians(a[0])))
+
+
+def load_gps_csv():
+    """{(case, version): (lat, lon)} from db/coordenadas_metadatos.csv."""
+    if not os.path.exists(GPS_CSV):
+        return {}
+    with open(GPS_CSV, newline='') as f:
+        return {(int(r['identificador']), r['version']): (float(r['lat']), float(r['lon'])) for r in csv.DictReader(f)}
+
+
+def extract_gps(photos):
+    """Read GPS from the photos into the CSV (dropping re-photographing spots), then strip it from them."""
+    known, found = load_gps_csv(), {}
+    for key, f in photos.items():
+        g = read_gps(os.path.join(PHOTOS, f))
+        if g:
+            found[key] = g
+    points = {**known, **found}
+    kept, dropped = dict(known), []
+    for key, g in found.items():
+        if any(k[0] != key[0] and metres(g, p) < SAME_SPOT_M for k, p in points.items()):
+            dropped.append(f'{key[0]}-{key[1]}')
+        else:
+            kept[key] = g
+    with open(GPS_CSV, 'w', newline='') as f:
+        w = csv.writer(f)
+        w.writerow(['identificador', 'version', 'lat', 'lon'])
+        for (n, v), (lat, lon) in sorted(kept.items()):
+            w.writerow([n, v, f'{lat:.5f}', f'{lon:.5f}'])
+    for root, _, fs in os.walk(PHOTOS):
+        for f in fs:
+            p = os.path.join(root, f)
+            if read_gps(p) and os.path.splitext(f)[1].lower() in ('.jpg', '.jpeg'):
+                strip_exif(p)
+    print(f'GPS: {len(found)} photos had it, {len(found) - len(dropped)} kept in {os.path.relpath(GPS_CSV, ROOT)}'
+          + (f'; discarded as a shared re-photographing spot: {", ".join(sorted(dropped))}' if dropped else ''))
+
+
+def build_cases(rows, photos, rep, gps=None):
     groups = {}
     for r in rows:
         try:
@@ -155,6 +239,8 @@ def build_cases(rows, photos, rep):
     for n, rs in sorted(groups.items()):
         where = f'case {n}'
         coords = [c for c in (parse_coord(r, rep) for r in rs) if c]
+        if not coords:                                                  # fall back to photo metadata
+            coords = [g for (m, v), g in sorted((gps or {}).items()) if m == n][:1]
         if len({(round(a, 4), round(b, 4)) for a, b in coords}) > 1:
             rep.warn(where, f'rows give different coordinates; using the first, {coords[0]}')
         items, descriptions = [], []
@@ -219,11 +305,15 @@ def export_photo(src_name, dst_rel):
 def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument('--check', action='store_true', help='validate only, write nothing')
+    ap.add_argument('--extract-gps', action='store_true', help='read GPS from the photos first (and strip it)')
     a = ap.parse_args()
 
     rep = Report()
     rows = read_rows(rep)
-    cases = build_cases(rows, index_photos(rep), rep) if not rep.errors else []
+    photos = index_photos(rep)
+    if a.extract_gps and not a.check:
+        extract_gps(photos)
+    cases = build_cases(rows, photos, rep, load_gps_csv()) if not rep.errors else []
     for w in rep.warnings:
         print('warning:', w)
     for e in rep.errors:

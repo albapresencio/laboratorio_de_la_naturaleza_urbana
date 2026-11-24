@@ -11,6 +11,7 @@ db/                          the archive database: edit this
   fotografias/               the photos, named <Identificador>-<versión>.jpg (or <Identificador>.jpg)
   fotografias/sin_catalogar/ photos not in the spreadsheet yet
   audios/                    audio recordings (not on the map yet)
+  coordenadas_metadatos.csv  coordinates read from the photos' GPS (scripts/build_archive.py --extract-gps)
   fuentes.xlsx               research links: archives and collections to look through
 web/                   the site (static, no build step): index.html, app.js, app.css
   data/                map data: buildings.json, trees.json, osm.json (+ cases.json, generated)
@@ -33,13 +34,19 @@ python3 -m venv .venv
    Archivo (source), Localización, Coordenada, Enlaces. The first Localización of a case is its title on the map.
 2. Save the photo in `db/fotografias/` as `<Identificador>-<versión>.jpg` (e.g. `6-c.jpg`); text after it is ignored.
 3. **Coordenada** puts the case on the map: `lat, lon` as Google Maps copies it (right-click a place → copy
-   `40.43436, -3.63828`). Cases without one are listed as warnings and left off the map.
+   `40.43436, -3.63828`). Without one, a case uses the GPS of its photos if they had any (below);
+   otherwise it is listed as a warning and left off the map.
 4. Validate and build:
 
 ```sh
 .venv/bin/python scripts/build_archive.py --check   # validate only
 .venv/bin/python scripts/build_archive.py           # validate, then write web/data/cases.json and web/media/
 ```
+
+**Coordinates from photo metadata.** After adding phone photos, run `build_archive.py --extract-gps` once: it
+reads each photo's GPS into `db/coordenadas_metadatos.csv` and then removes it from the photo (losslessly), so
+nobody's location is published. A point shared by photos of *different* cases is discarded: that is where old
+album photos were re-photographed, not the place. The Coordenada column always wins over the metadata.
 
 Errors (a malformed Identificador, Versión or Coordenada, two photos for the same version) stop the build.
 Warnings (no Coordenada yet, a photo without a row, a place outside the map frame) don't.
