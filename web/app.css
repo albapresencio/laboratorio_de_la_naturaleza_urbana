@@ -17,7 +17,11 @@ body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.45 "Instrument S
 #root,.app{height:100%}.app{position:relative}
 .map{position:relative;height:100%;overflow:hidden;cursor:grab;touch-action:none;user-select:none}
 .map.drag{cursor:grabbing}.map.placing{cursor:copy}.map.over{cursor:pointer}
-.map>canvas{position:absolute;inset:0;width:100%;height:100%;transform-origin:0 0}
+.map>canvas{position:absolute;inset:0;width:100%;height:100%;transform-origin:0 0}.map>canvas.under,.map>canvas.over{transform:none!important;pointer-events:none}
+/* outside the frame: paper, a generated grain (paper.png, near white) multiplied onto a warm tint of the ground */
+.map{background:color-mix(in srgb,var(--bg) 93%,#d9cfbd) url(paper.png) 0 0/640px 640px;background-blend-mode:multiply}
+:root[data-theme=dark] .map{background-blend-mode:soft-light}
+@media(prefers-color-scheme:dark){:root:not([data-theme=light]) .map{background-blend-mode:soft-light}}
 .title{position:absolute;left:16px;top:12px;font-size:13px;color:var(--mute);pointer-events:none}.title b{color:var(--ink);font-weight:600}
 
 /* squares that hold data: an ink outline and their count. Hover: today's orthophoto reveals itself and the 1956 one follows a slider under the pointer.
@@ -25,6 +29,8 @@ body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.45 "Instrument S
 .blk{position:absolute;pointer-events:none;z-index:3;transition:opacity .35s}
 .blk .mark{position:absolute;inset:0;border:1.25px solid var(--ink);transition:opacity .2s}
 .blk .count{position:absolute;inset:0;display:grid;place-items:center;font-family:Fraunces,Georgia,serif;font-weight:300;font-optical-sizing:auto;line-height:1;color:var(--ink);font-variant-numeric:lining-nums;transition:opacity .2s}
+/* a square that only holds approximate cases: dashed, its count in the corner (so it reads under the exact squares it may contain) */
+.blk.approx .mark{border-style:dashed}.blk.approx .count{inset:auto 6px 4px auto;font-size:15px!important}
 .blk .tab{position:absolute;left:-1px;bottom:100%;margin-bottom:6px;font-size:12px;line-height:1.2;white-space:nowrap;background:var(--card);padding:2px 6px;border:1px solid var(--line);opacity:0;transition:opacity .2s}
 .blk .tab i{font-style:normal;color:var(--mute)}
 .blk .lift{position:absolute;inset:0;box-shadow:0 10px 30px rgb(0 0 0/.22);opacity:0;transition:opacity .3s}
@@ -46,9 +52,12 @@ body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.45 "Instrument S
 .blk .corners i:nth-child(3){left:0;bottom:0;border-width:0 0 2px 2px}.blk .corners i:nth-child(4){right:0;bottom:0;border-width:0 2px 2px 0}
 .blk.pin .corners{opacity:1;transform:none}
 .map.focus .blk:not(.on){opacity:.12}
+.blk .nm{position:absolute;left:4px;top:3px;max-width:calc(100% - 8px);font-size:10px;line-height:1.3;color:var(--ink);background:color-mix(in srgb,var(--card) 82%,transparent);padding:0 3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;transition:opacity .2s}
+.map.focus .blk:not(.on) .nm{opacity:0}
 .pager{position:absolute;z-index:7;transform:translateX(-50%);display:flex;align-items:center;gap:6px;font-size:12px;background:var(--card);border:1px solid var(--line);padding:2px;animation:rise .3s ease both}
 .pager button{min-height:28px;min-width:28px;padding:0;border:0}
-.bw canvas.now{filter:grayscale(1) contrast(1.08)}
+.bw canvas.now{filter:grayscale(1) brightness(1.314) contrast(.797)}
+.bw .map>canvas{filter:grayscale(1)}.bw .map{background-color:color-mix(in srgb,var(--bg) 93%,#cfcfcf)}
 .hint{position:absolute;pointer-events:none;outline:1.5px solid var(--ink);background:color-mix(in srgb,var(--ink) 6%,transparent)}
 
 /* squares that show a case (unlike squares that hold data): a white, semi-transparent mat with a white border, the item mounted inside.
@@ -59,6 +68,8 @@ body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.45 "Instrument S
 .leads g.idle{transition:opacity .35s}.map.focus .leads g.idle{opacity:0}
 .leads .dot{fill:#fff;stroke:#1f1f1f;stroke-width:1.25;opacity:0;animation:fade .35s ease forwards;animation-delay:.5s;transition:r .2s}
 .leads .dot.lit{r:6px}
+.leads .unc,.lensmap .unc{fill:color-mix(in srgb,var(--ink) 6%,transparent);stroke:var(--ink);stroke-width:1;stroke-dasharray:3 3;opacity:.7}
+.lensmap .unc{stroke:#fff;fill:rgb(255 255 255/.08);opacity:.9}
 @keyframes lead{to{stroke-dashoffset:0}}@keyframes fade{to{opacity:1}}
 .card{position:absolute;z-index:6;cursor:pointer;outline:none;transition:opacity .35s}
 .map.focus .card.idle{opacity:0;pointer-events:none}
@@ -114,22 +125,28 @@ body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.45 "Instrument S
 .stage .chip{font-size:12px;padding:3px 8px;background:rgb(255 255 255/.92);color:#1f1f1f}
 .stage .chip input{vertical-align:middle;width:110px;accent-color:#1f1f1f;margin:0 0 0 6px}
 .stage .chip.src{margin-left:auto;color:#55554f}
-.viewer{position:absolute;inset:0;display:grid;place-items:center;padding:28px;background:var(--bg);animation:rise .35s ease both}
-.viewer .pic{position:relative;display:inline-block;max-width:100%;max-height:100%;line-height:0;box-shadow:0 10px 40px rgb(0 0 0/.12)}
-.viewer .pic img{max-width:calc(100vw - 420px);max-height:calc(100vh - 110px);display:block;user-select:none;-webkit-user-drag:none}
+.viewer{position:absolute;inset:0;display:grid;place-items:center end;padding:20px 24px 60px 38%;pointer-events:none}
+.viewer .float{pointer-events:auto;margin:0;max-width:100%;max-height:100%;display:flex;flex-direction:column;gap:8px;padding:10px;background:var(--card);
+  box-shadow:0 0 0 .5px rgb(0 0 0/.12),0 18px 50px rgb(0 0 0/.28);animation:rise .35s ease both;overflow:auto}
+.viewer figcaption{display:flex;align-items:center;gap:10px;font-size:13px;color:var(--mute)}
+.viewer figcaption .x{margin-left:auto;min-height:28px;min-width:28px;padding:0;font-size:18px;line-height:1}
+.viewer .pic{position:relative;display:inline-block;max-width:100%;line-height:0;align-self:center}
+.viewer .pic img{max-width:calc((100vw - 340px)*.6 - 44px);max-height:calc(100vh - 230px);display:block;user-select:none;-webkit-user-drag:none}
 .viewer .pic.pair{cursor:ew-resize;touch-action:none}
 .viewer .pic .bf{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;max-width:none;max-height:none;clip-path:inset(0 calc(100% - var(--w)) 0 0)}
-.viewer .seam{position:absolute;top:0;bottom:0;left:var(--w);width:2px;margin-left:-1px;background:#fff}
-.viewer .knob{position:absolute;top:50%;left:var(--w);width:34px;height:34px;margin:-17px 0 0 -17px;border-radius:50%;background:#fff;color:#1f1f1f;box-shadow:0 1px 6px rgb(0 0 0/.25);display:grid;place-items:center;font-size:13px;line-height:1}
-.viewer .tag{position:absolute;bottom:10px;padding:1px 7px;font-size:12px;line-height:1.5;background:rgb(255 255 255/.92);color:#1f1f1f}
-.viewer figcaption{position:absolute;left:28px;top:20px;font-size:13px;color:var(--mute)}
-.viewer .text{max-width:34em;font:300 clamp(18px,2.2vw,26px)/1.45 Fraunces,Georgia,serif}
+.viewer .seam{position:absolute;top:0;bottom:0;width:2px;margin-left:-1px;background:#fff;z-index:20}
+.viewer .knob{position:absolute;top:50%;width:34px;height:34px;margin:-17px 0 0 -17px;border-radius:50%;background:#fff;color:#1f1f1f;box-shadow:0 1px 6px rgb(0 0 0/.25);display:grid;place-items:center;font-size:13px;line-height:1;z-index:21;cursor:ew-resize}
+.viewer .knob:focus-visible{outline:2px solid var(--tree);outline-offset:2px}
+.viewer .tag{position:absolute;bottom:10px;padding:1px 7px;font-size:12px;line-height:1.5;background:rgb(255 255 255/.92);color:#1f1f1f;z-index:22}
+.viewer .tag.vt{transform:translateX(-50%);white-space:nowrap;max-width:30%;overflow:hidden;text-overflow:ellipsis}
+.viewer .cap{max-width:calc((100vw - 340px)*.6 - 44px);font-size:13px;line-height:1.4}
+.viewer .cap p{margin:0 0 4px}.viewer .cap b{display:inline-block;min-width:1.3em;font-weight:600}.viewer .cap i{color:var(--mute);font-style:normal}
+.viewer .cap a{color:var(--mute);font-size:12px;white-space:nowrap}
+.viewer .text{max-width:30em;margin:0;font:300 clamp(17px,1.8vw,23px)/1.45 Fraunces,Georgia,serif}
 .viewer .text small{display:block;font:12px "Instrument Sans",system-ui,sans-serif;color:var(--mute);margin-bottom:14px;letter-spacing:.04em;text-transform:uppercase}
-.viewer .doc{width:min(760px,100%);height:100%;display:flex;flex-direction:column;gap:8px}
+.viewer .doc{width:min(640px,55vw);height:70vh;display:flex;flex-direction:column;gap:8px}
 .viewer .doc iframe{flex:1;border:1px solid var(--line);background:#fff;width:100%}
-.viewer .cmp{position:absolute;left:50%;bottom:18px;transform:translateX(-50%);display:flex;gap:4px}
-.viewer .cmp button{min-height:30px;font-size:12px}.viewer .cmp button[aria-pressed=true]{background:var(--ink);color:var(--bg);border-color:var(--ink)}
-.viewer .aud{width:min(720px,100%)}
+.viewer .aud{width:min(560px,50vw)}
 .files header{position:sticky;top:0;z-index:1;background:var(--card);display:flex;justify-content:space-between;align-items:flex-start;gap:10px;padding:14px 14px 10px 16px;border-bottom:1px solid var(--line)}
 .files header small{color:var(--mute);font-size:12px}.files h2{margin:0;font-size:18px;font-weight:600;line-height:1.2}
 .files .close{font-size:20px;padding:0;width:36px;flex:none}
@@ -144,6 +161,7 @@ body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.45 "Instrument S
 .files .ch .no{font-size:10px;letter-spacing:.05em;border:1px solid var(--ink);padding:2px 5px 1px;margin-right:8px;font-variant-numeric:tabular-nums;vertical-align:2px}
 .files .ch b{font-weight:600;font-size:15px}.files .ch small{display:block;color:var(--mute);font-size:12px;margin-top:2px}
 .files section.cur .ch b{text-decoration:underline;text-underline-offset:3px;text-decoration-thickness:1px}
+.files .gm{display:block;padding:0 16px 4px;font-size:12px;color:var(--mute)}
 .files .own{display:flex;gap:6px;padding:4px 16px 0}.files .own button{min-height:30px;font-size:12px}
 .files .src{color:var(--mute);font-size:11px;padding:12px 16px 16px;margin:0}
 
@@ -152,8 +170,10 @@ button:hover{border-color:var(--frame)}button:focus-visible,input:focus-visible{
 .tools{position:absolute;z-index:7;right:14px;bottom:14px;display:flex;flex-direction:column;gap:4px}.tools button{padding:0;width:36px;font-size:16px}
 /* legend: collapsed to one line by default */
 .legend{position:absolute;left:14px;bottom:14px;z-index:7;background:var(--card);border:1px solid var(--line);font-size:13px;max-width:calc(100% - 80px)}
-.legend>.toggle{border:0;width:100%;display:flex;gap:10px;align-items:center;justify-content:space-between;min-height:36px;font-size:13px}
-.legend>.toggle span{color:var(--mute)}
+.legend .head{display:flex;align-items:stretch}
+.legend .bwt{border:0;border-left:1px solid var(--line);font-size:12px;min-height:36px;white-space:nowrap}.legend .bwt[aria-pressed=true]{background:var(--ink);color:var(--bg)}
+.legend .head .toggle{border:0;width:100%;display:flex;gap:10px;align-items:center;justify-content:space-between;min-height:36px;font-size:13px}
+.legend .toggle span{color:var(--mute)}
 .legend .body{padding:4px 12px 12px;width:236px;max-width:100%}
 .legend label{display:flex;align-items:center;gap:10px;min-height:32px;cursor:pointer}
 .legend input[type=checkbox]{width:16px;height:16px;margin:0;accent-color:var(--ink)}
@@ -166,6 +186,6 @@ input[type=file]{display:none}
 @media(max-width:700px){
  .explore{grid-template-columns:1fr;grid-template-rows:58% 42%}
  .explore .files{border-left:0;border-top:1px solid var(--line);transform:translateY(18px)}
- .viewer{padding:12px}.viewer .pic img{max-width:calc(100vw - 24px);max-height:calc(58vh - 40px)}
+ .viewer{padding:12px;place-items:center}.viewer .pic img,.viewer .cap{max-width:calc(100vw - 48px)}.viewer .pic img{max-height:calc(58vh - 120px)}
  .stage .chip.src{display:none}}
 @media(prefers-reduced-motion:reduce){*,*::before,*::after{animation-duration:.01ms!important;animation-delay:0s!important;transition:none!important}}

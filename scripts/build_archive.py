@@ -63,10 +63,11 @@ MAX_PX = 2000
 IMAGE_EXT = {'.jpg', '.jpeg', '.png', '.webp', '.tif', '.tiff'}
 PHOTO_NAME = re.compile(r'^(\d+)(?:-([a-z]))?(?![a-z])', re.I)
 COORD = re.compile(r'^\s*(-?\d+(?:\.\d+)?)\s*[,;\s]\s*(-?\d+(?:\.\d+)?)\s*$')
-LONG_TEXT = 90                       # descriptions longer than this also become a text item
 NOTE = ('Archive cases, built from db/archivo_fotografias.xlsx by scripts/build_archive.py: do not edit by hand. '
         'Each case is geolocated: exact (lon/lat) or approximate (lon/lat + r in metres). '
-        'Items: versions {photos:[{src,label,v}...]} (one photo in several versions), photo {src,label}, text {body,label}, audio {src,label}, file {src,label}.')
+        'loc says where the coordinate comes from: sheet (Coordenada), gps (photo metadata) or estimate (from Localización). '
+        'Items: versions {photos:[{src,label,credit,v}...]} (one photo in several versions), photo {src,label,credit}, '
+        'text {body,label}, audio {src,label}, file {src,label}.')
 COLUMNS = {'id': 'identificador', 'version': 'version', 'year': 'ano', 'name': 'nombre imagen', 'source': 'archivo',
            'place': 'localizacion', 'coord': 'coordenada', 'link': 'enlaces', 'radius': 'radio (m)'}
 REQUIRED = ('id', 'name')
@@ -94,6 +95,11 @@ def text(v):
     if isinstance(v, float) and v.is_integer():
         v = int(v)
     return ' '.join(str(v).split())                                   # collapse whitespace and newlines
+
+
+def tidy(name):
+    """A name typed as a file name (Parque-Marques-de-Suanzes) reads as words."""
+    return name.replace('-', ' ') if ' ' not in name and '-' in name else name
 
 
 def read_rows(rep):
@@ -251,16 +257,15 @@ def build_cases(rows, photos, rep, gps=None, approx=None):
     cases, used = [], set()
     for n, rs in sorted(groups.items()):
         where = f'case {n}'
-        coords = [c for c in (parse_coord(r, rep) for r in rs) if c]
+        coords, loc, approx_r = [c for c in (parse_coord(r, rep) for r in rs) if c], 'sheet', None
         if not coords:                                                  # fall back to photo metadata
-            coords = [g for (m, v), g in sorted((gps or {}).items()) if m == n][:1]
-        approx_r = None
+            coords, loc = [g for (m, v), g in sorted((gps or {}).items()) if m == n][:1], 'gps'
         if not coords and n in (approx or {}):                          # last resort: an estimate with a radius
             lat, lon, approx_r = approx[n]
-            coords = [(lat, lon)]
+            coords, loc = [(lat, lon)], 'estimate'
         if len({(round(a, 4), round(b, 4)) for a, b in coords}) > 1:
             rep.warn(where, f'rows give different coordinates; using the first, {coords[0]}')
-        items, descriptions = [], []
+        items = []
         for r in sorted(rs, key=lambda r: r['_v']):
             name, year, source = text(r['name']), text(r.get('year')), text(r.get('source'))
             if not name:
@@ -270,21 +275,18 @@ def build_cases(rows, photos, rep, gps=None, approx=None):
                 rep.warn(r['_where'], f'no photo {n}-{r["_v"]} in db/fotografias')
                 continue
             used.add((n, r['_v']))
-            item = {'type': 'photo', 'src': f, '_v': r['_v'], 'label': ' · '.join(x for x in (year, source) if x) or name,
-                    'name': name}
+            item = {'type': 'photo', 'src': f, '_v': r['_v'], 'label': tidy(name)}
+            credit = ' · '.join(x for x in (year, source) if x)
+            if credit:
+                item['credit'] = credit
             if text(r.get('link')):
                 item['link'] = text(r['link'])
             items.append(item)
-            if name and name not in descriptions:
-                descriptions.append(name)
         title = next((text(r.get('place')) for r in rs if text(r.get('place'))), '') or text(rs[0]['name'])
-        title = title[:1].upper() + title[1:]
+        title = tidy(title[:1].upper() + title[1:])
         if len(items) > 1:                                              # the versions of one photo, linked
             items = [{'type': 'versions', 'photos': [{k: x for k, x in it.items() if k != 'type'} | {'v': it['_v']}
                                                      for it in items]}]
-        body = [d for d in descriptions if len(d) > LONG_TEXT or d.lower() != title.lower()]
-        if body and any(len(d) > LONG_TEXT for d in body):
-            items.append({'type': 'text', 'label': 'Descripción', 'body': ' · '.join(body)})
         years = list(dict.fromkeys(text(r.get('year')) for r in rs if text(r.get('year'))))
         case = {'id': f'c{n}', 'n': n, 'title': title, 'items': items, '_where': where}
         if years:
@@ -299,7 +301,7 @@ def build_cases(rows, photos, rep, gps=None, approx=None):
         if not inside(*proj(lon, lat)):
             rep.warn(where, f'{lat}, {lon} is outside the map frame (scripts/frame.py): not on the map')
             continue
-        case['lat'], case['lon'] = lat, lon
+        case['lat'], case['lon'], case['loc'] = lat, lon, loc
         radius = text(next((r.get('radius') for r in rs if text(r.get('radius'))), ''))
         if radius:
             try:

@@ -78,6 +78,7 @@ The base layers are committed; rebuild them only when the sources change. All sh
 | `trees.py <dir>` | Ayuntamiento de Madrid, `ARBOLADO_MADRID_7_7_26` shapefile (datos.madrid.es) | `web/data/trees.json` |
 | `osm.py <out> <overpass.json...>` | Overpass API responses (parks, water) | `web/data/osm.json` |
 | `ortho1956.py` | IGN WMS, Vuelo Americano Serie B 1956–57 (slow, resumable) | `web/tiles/1956/` |
+| `places.py <overpass.json>` | OSM place nodes (districts, barrios, neighbourhoods, squares); query in the script | `web/data/places.json` (square names) |
 | `palette_lab.py [--bundle]` | `web/data` | `palettes/data/crop.json` (+ `palettes/dist/index.html`) |
 | `vegetation.py <images>` | street photos; needs `requirements-vegetation.txt` | `vegetation_out/` (Green View Index report) |
 
