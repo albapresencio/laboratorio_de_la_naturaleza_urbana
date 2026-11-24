@@ -29,6 +29,10 @@ Coordinates from photo metadata (--extract-gps): the GPS of each photo in db/fot
 db/coordenadas_metadatos.csv, and then removed from the photo (losslessly) so nobody's location is published.
 A point shared by photos of different cases is discarded: it is where old photos were re-photographed, not
 the place. A case without Coordenada uses the first metadata point of its photos.
+
+Approximate coordinates: db/coordenadas_aproximadas.csv (identificador, lat, lon, radio_m, lugar) holds estimates
+made from Localización, with a radius for their uncertainty; the map draws them as approximate. They are the
+last resort: Coordenada, then photo GPS, then the estimate.
 """
 import argparse
 import csv
@@ -51,6 +55,7 @@ ROOT = os.path.normpath(os.path.join(os.path.dirname(os.path.abspath(__file__)),
 XLSX = os.path.join(ROOT, 'db', 'archivo_fotografias.xlsx')
 PHOTOS = os.path.join(ROOT, 'db', 'fotografias')
 GPS_CSV = os.path.join(ROOT, 'db', 'coordenadas_metadatos.csv')
+APPROX_CSV = os.path.join(ROOT, 'db', 'coordenadas_aproximadas.csv')
 SAME_SPOT_M = 30                     # GPS points closer than this in different cases: a re-photographing spot
 OUT_JSON = os.path.join(ROOT, 'web', 'data', 'cases.json')
 OUT_MEDIA = os.path.join(ROOT, 'web', 'media')
@@ -187,6 +192,14 @@ def load_gps_csv():
         return {(int(r['identificador']), r['version']): (float(r['lat']), float(r['lon'])) for r in csv.DictReader(f)}
 
 
+def load_approx_csv():
+    """{case: (lat, lon, radius m)} from db/coordenadas_aproximadas.csv."""
+    if not os.path.exists(APPROX_CSV):
+        return {}
+    with open(APPROX_CSV, newline='') as f:
+        return {int(r['identificador']): (float(r['lat']), float(r['lon']), int(r['radio_m'])) for r in csv.DictReader(f)}
+
+
 def extract_gps(photos):
     """Read GPS from the photos into the CSV (dropping re-photographing spots), then strip it from them."""
     known, found = load_gps_csv(), {}
@@ -215,7 +228,7 @@ def extract_gps(photos):
           + (f'; discarded as a shared re-photographing spot: {", ".join(sorted(dropped))}' if dropped else ''))
 
 
-def build_cases(rows, photos, rep, gps=None):
+def build_cases(rows, photos, rep, gps=None, approx=None):
     groups = {}
     for r in rows:
         try:
@@ -241,6 +254,10 @@ def build_cases(rows, photos, rep, gps=None):
         coords = [c for c in (parse_coord(r, rep) for r in rs) if c]
         if not coords:                                                  # fall back to photo metadata
             coords = [g for (m, v), g in sorted((gps or {}).items()) if m == n][:1]
+        approx_r = None
+        if not coords and n in (approx or {}):                          # last resort: an estimate with a radius
+            lat, lon, approx_r = approx[n]
+            coords = [(lat, lon)]
         if len({(round(a, 4), round(b, 4)) for a, b in coords}) > 1:
             rep.warn(where, f'rows give different coordinates; using the first, {coords[0]}')
         items, descriptions = [], []
@@ -286,6 +303,8 @@ def build_cases(rows, photos, rep, gps=None):
                 case['r'] = int(round(float(radius)))
             except ValueError:
                 rep.error(where, f'Radio (m) "{radius}" must be a number of metres')
+        elif approx_r:
+            case['r'] = approx_r
         cases.append(case)
     for key in sorted(set(photos) - used):
         rep.warn('db/fotografias', f'"{photos[key]}" has no row in the spreadsheet')
@@ -313,7 +332,7 @@ def main():
     photos = index_photos(rep)
     if a.extract_gps and not a.check:
         extract_gps(photos)
-    cases = build_cases(rows, photos, rep, load_gps_csv()) if not rep.errors else []
+    cases = build_cases(rows, photos, rep, load_gps_csv(), load_approx_csv()) if not rep.errors else []
     for w in rep.warnings:
         print('warning:', w)
     for e in rep.errors:

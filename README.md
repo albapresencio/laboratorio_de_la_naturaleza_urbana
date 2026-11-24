@@ -12,6 +12,7 @@ db/                          the archive database: edit this
   fotografias/sin_catalogar/ photos not in the spreadsheet yet
   audios/                    audio recordings (not on the map yet)
   coordenadas_metadatos.csv  coordinates read from the photos' GPS (scripts/build_archive.py --extract-gps)
+  coordenadas_aproximadas.csv  estimated coordinates (with an uncertainty radius) for cases without a better one
   fuentes.xlsx               research links: archives and collections to look through
 web/                   the site (static, no build step): index.html, app.js, app.css
   data/                map data: buildings.json, trees.json, osm.json (+ cases.json, generated)
@@ -47,6 +48,10 @@ python3 -m venv .venv
 reads each photo's GPS into `db/coordenadas_metadatos.csv` and then removes it from the photo (losslessly), so
 nobody's location is published. A point shared by photos of *different* cases is discarded: that is where old
 album photos were re-photographed, not the place. The Coordenada column always wins over the metadata.
+
+**Approximate coordinates.** `db/coordenadas_aproximadas.csv` holds estimates made from each case's Localización,
+with `radio_m` for how unsure they are; the map draws those cases as approximate. They are used only when a case
+has neither a Coordenada nor photo GPS, so filling in a real Coordenada replaces them.
 
 Errors (a malformed Identificador, Versión or Coordenada, two photos for the same version) stop the build.
 Warnings (no Coordenada yet, a photo without a row, a place outside the map frame) don't.
