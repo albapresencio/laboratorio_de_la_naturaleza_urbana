@@ -202,7 +202,7 @@ def extract_gps(photos):
         else:
             kept[key] = g
     with open(GPS_CSV, 'w', newline='') as f:
-        w = csv.writer(f)
+        w = csv.writer(f, lineterminator='\n')
         w.writerow(['identificador', 'version', 'lat', 'lon'])
         for (n, v), (lat, lon) in sorted(kept.items()):
             w.writerow([n, v, f'{lat:.5f}', f'{lon:.5f}'])
