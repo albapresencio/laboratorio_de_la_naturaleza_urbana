@@ -6,12 +6,15 @@ current orthophotos, and an archive of geolocated cases (photos, before/after pa
 ## Layout
 
 ```
-db/                    the archive database: edit this
-  casos.xlsx           cases and their items (sheets "casos", "elementos"; "léeme" explains every column)
-  media/               the photos, audio and documents the spreadsheet refers to
+db/                          the archive database: edit this
+  archivo_fotografias.xlsx   one row per photo; rows sharing an Identificador form a case
+  fotografias/               the photos, named <Identificador>-<versión>.jpg (or <Identificador>.jpg)
+  fotografias/sin_catalogar/ photos not in the spreadsheet yet
+  audios/                    audio recordings (not on the map yet)
+  fuentes.xlsx               research links: archives and collections to look through
 web/                   the site (static, no build step): index.html, app.js, app.css
   data/                map data: buildings.json, trees.json, osm.json (+ cases.json, generated)
-  media/               generated from db/media
+  media/               generated from db/fotografias
   tiles/1956/          1956 orthophoto tile pyramid
 scripts/               data pipeline (Python)
 palettes/              palette lab: the same map crop drawn in candidate palettes
@@ -26,18 +29,21 @@ python3 -m venv .venv
 
 ## Editing the archive
 
-1. Put new photos, audio or documents in `db/media/` (any subfolder).
-2. Add or edit rows in `db/casos.xlsx`: one row per case in `casos`, one row per item in `elementos`.
-3. Validate and build:
+1. Add a row per photo to `db/archivo_fotografias.xlsx`: Identificador, Versión (a, b, c…), Año, Nombre imagen,
+   Archivo (source), Localización, Coordenada, Enlaces. The first Localización of a case is its title on the map.
+2. Save the photo in `db/fotografias/` as `<Identificador>-<versión>.jpg` (e.g. `6-c.jpg`); text after it is ignored.
+3. **Coordenada** puts the case on the map: `lat, lon` as Google Maps copies it (right-click a place → copy
+   `40.43436, -3.63828`). Cases without one are listed as warnings and left off the map.
+4. Validate and build:
 
 ```sh
 .venv/bin/python scripts/build_archive.py --check   # validate only
 .venv/bin/python scripts/build_archive.py           # validate, then write web/data/cases.json and web/media/
 ```
 
-The script checks ids, coordinates (inside the map frame, lon/lat not swapped), radii, item types, captions, that every
-file exists with the right extension and that every case has at least one item. On any error it writes nothing.
-Photos larger than 2000 px are scaled down for the web. Unused files in `db/media` are reported as warnings.
+Errors (a malformed Identificador, Versión or Coordenada, two photos for the same version) stop the build.
+Warnings (no Coordenada yet, a photo without a row, a place outside the map frame) don't.
+Web copies of the photos are scaled to 2000 px and stripped of metadata, including GPS.
 
 ## Running the site
 

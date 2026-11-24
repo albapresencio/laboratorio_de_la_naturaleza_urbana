@@ -1,5 +1,0 @@
-MUESTRA — documento de ejemplo
-
-Este archivo de texto ocupa el lugar de un documento real del archivo
-(transcripción, ficha de campo, carta...). Sustitúyelo por el material
-del caso y actualiza data/cases.json.
