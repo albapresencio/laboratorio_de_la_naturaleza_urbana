@@ -1,0 +1,190 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Palette lab — Madrid map</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Instrument+Sans:wght@400;500;600&family=Fraunces:opsz,wght@9..144,300&display=swap" rel="stylesheet">
+<style>
+/* VOICE: a quiet working tool; the swatches and the map crops are the only colour.
+   IDEA: a printer's proof sheet: the same crop of Madrid pulled in several inks, laid side by side.
+   PICTURE: each card is the real map (Manzanares, Plaza Mayor, Retiro) drawn in that palette.
+   COLOUR and TYPE: neutral grey chrome so palettes aren't biased; Instrument Sans, Fraunces numerals as on the map.
+   LAYOUT: proof grid of cards; the selected palette's editor sits right (below on narrow screens). */
+:root{color-scheme:light;--bg:#f4f4f2;--ink:#1d1d1b;--mute:#76766f;--line:#dcdcd7;--card:#fff;--sel:#1d1d1b}
+*{box-sizing:border-box;min-width:0}
+body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.45 "Instrument Sans",system-ui,sans-serif}
+header{display:flex;flex-wrap:wrap;gap:10px 18px;align-items:center;justify-content:space-between;padding:14px max(2vw,14px);border-bottom:1px solid var(--line);background:var(--card);position:sticky;top:0;z-index:5}
+h1{font-size:18px;font-weight:600;margin:0}h1 span{color:var(--mute);font-weight:400}
+.row{display:flex;flex-wrap:wrap;gap:6px;align-items:center}
+button{font:inherit;font-size:14px;color:var(--ink);background:var(--card);border:1px solid var(--line);min-height:36px;padding:0 12px;cursor:pointer}
+button:hover{border-color:#a9a9a2}button:focus-visible,input:focus-visible{outline:2px solid #2f6bff;outline-offset:2px}
+button[aria-pressed=true]{background:var(--ink);color:#fff;border-color:var(--ink)}
+.wrap{display:grid;grid-template-columns:minmax(0,1fr) 330px;gap:0;align-items:start}
+main{padding:16px max(2vw,14px) 40px;display:grid;grid-template-columns:repeat(auto-fill,minmax(min(100%,360px),1fr));gap:14px}
+main.large{grid-template-columns:repeat(auto-fill,minmax(min(100%,620px),1fr))}
+.fam{grid-column:1/-1;margin:10px 0 -4px;font-size:13px;font-weight:600;color:var(--mute)}.fam:first-child{margin-top:0}
+.card{background:var(--card);border:1px solid var(--line);cursor:pointer;position:relative}
+.card.on{outline:2px solid var(--sel);outline-offset:-1px}
+.card .fig{position:relative;aspect-ratio:5/3}.card canvas{position:absolute;inset:0;width:100%;height:100%;display:block}
+.card .meta{display:flex;align-items:center;gap:8px;padding:8px 10px}
+.card .name{font-weight:600;font-size:14px;margin-right:auto;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.card .sw{display:flex;gap:0;border:1px solid var(--line)}.card .sw i{width:14px;height:14px;display:block}
+.star{border:0;background:none;min-height:30px;padding:0 4px;font-size:17px;color:#b9b9b2}.star[aria-pressed=true]{background:none;color:#e0a100}
+.tag{position:absolute;left:8px;top:8px;font-size:11px;background:rgb(255 255 255/.85);padding:1px 6px;color:#333}
+aside{position:sticky;top:65px;max-height:calc(100vh - 65px);overflow:auto;border-left:1px solid var(--line);background:var(--card);padding:16px 16px 28px}
+aside h2{font-size:15px;margin:0 0 4px}aside .hint{color:var(--mute);font-size:13px;margin:0 0 12px}
+aside input[type=text]{font:inherit;font-size:16px;width:100%;border:1px solid var(--line);padding:6px 8px;margin-bottom:10px}
+.roles{display:grid;grid-template-columns:auto 1fr 84px;gap:6px 10px;align-items:center;font-size:14px}
+.roles input[type=color]{width:38px;height:30px;padding:0;border:1px solid var(--line);background:none;cursor:pointer}
+.roles input.hex{font:13px ui-monospace,Menlo,monospace;width:84px;border:1px solid var(--line);padding:5px 6px}
+.roles .grp{grid-column:1/-1;color:var(--mute);font-size:12px;margin-top:8px;border-top:1px solid var(--line);padding-top:8px}
+.slider{display:grid;grid-template-columns:1fr auto;gap:2px 10px;font-size:14px;margin-top:10px}.slider input{grid-column:1/-1;width:100%;accent-color:var(--ink)}
+.slider span{color:var(--mute);font-variant-numeric:tabular-nums}
+aside .row{margin-top:14px}
+textarea{width:100%;height:150px;font:12px ui-monospace,Menlo,monospace;margin-top:10px;border:1px solid var(--line);padding:8px}
+.toast{position:fixed;left:50%;bottom:20px;transform:translateX(-50%);background:var(--ink);color:#fff;padding:8px 14px;font-size:14px;opacity:0;transition:opacity .2s;pointer-events:none}.toast.on{opacity:1}
+.load{padding:40px;color:var(--mute)}
+@media(max-width:900px){.wrap{grid-template-columns:1fr}aside{position:static;max-height:none;border-left:0;border-top:1px solid var(--line)}}
+@media(prefers-reduced-motion:reduce){.toast{transition:none}}
+</style>
+</head>
+<body>
+<header>
+  <h1>Palette lab <span>· Madrid map, Manzanares to Retiro · 1 km grid, 250 m sub-grid</span></h1>
+  <div class="row">
+    <button id="bTrees" aria-pressed="true">Trees</button>
+    <button id="bPhoto" aria-pressed="true">Photo square</button>
+    <button id="bLarge" aria-pressed="false">Large</button>
+    <button id="bStar" aria-pressed="false">Starred only</button>
+    <button id="bReset">Reset to proposals</button>
+  </div>
+</header>
+<div class="wrap">
+  <main id="grid"><div class="load">Loading the map crop…</div></main>
+  <aside id="ed"></aside>
+</div>
+<div class="toast" id="toast"></div>
+<script>
+{
+/* roles every palette sets; trees and parks are deliberately kept in one hue family */
+const ROLES=[['Ground',[['bg','Background'],['grid','Grid'],['gridk','Grid, 1 km'],['ink','Ink: frame, photo squares'],['mute','Labels']]],
+             ['Buildings',[['b0','Residential'],['b1','Industrial'],['b2','Services'],['bl','Outline']]],
+             ['Nature',[['green','Parks'],['tree','Trees'],['water','Water']]]];
+/* fam groups the cards; ws = water outline in px (thickens rivers so water courses lead) */
+const PROPOSALS=[
+ {id:'ladrillo',fam:'Red buildings',name:'Ladrillo',bg:'#ffffff',grid:'#f1eeee',gridk:'#e2dcdc',ink:'#1f2430',mute:'#8d8a8a',b0:'#f3dad5',b1:'#ecc7c0',b2:'#e3b4ab',bl:'#c8504a',bs:'fill',bw:.5,green:'#e3ebd8',tree:'#6b8f5e',water:'#2f6fa3',ta:.6,ts:1,ws:1.5},
+ {id:'linea-roja',fam:'Red buildings',name:'Línea roja',bg:'#ffffff',grid:'#f0f0f0',gridk:'#dedede',ink:'#1b1f27',mute:'#8a8a8a',b0:'#ffffff',b1:'#ffffff',b2:'#ffffff',bl:'#c8504a',bs:'line',bw:.22,green:'#e6eedf',tree:'#5f8a5f',water:'#3b7bbf',ta:.55,ts:1,ws:1.5},
+ {id:'rojo-contorno',fam:'Red buildings',name:'Rojo con contorno',bg:'#ffffff',grid:'#f2efef',gridk:'#e1dcdc',ink:'#1a2233',mute:'#8b8888',b0:'#f8e7e4',b1:'#f3dcd8',b2:'#eed1cc',bl:'#c8504a',bs:'both',bw:.18,green:'#dfe9d9',tree:'#4f7d5a',water:'#1f5f99',ta:.6,ts:1,ws:1.5},
+ {id:'terracota',fam:'Red buildings',name:'Terracota suave',bg:'#fbf8f5',grid:'#f1ebe6',gridk:'#e2d8d0',ink:'#2a2a33',mute:'#948a84',b0:'#f0d6cc',b1:'#e8c4b6',b2:'#dfb2a2',bl:'#b9533f',bs:'fill',bw:.5,green:'#e6ead5',tree:'#7a9461',water:'#2a6496',ta:.6,ts:1,ws:1.5},
+ {id:'cobalto',fam:'Red buildings',name:'Cobalto',bg:'#ffffff',grid:'#f0f0f2',gridk:'#dddde2',ink:'#14213d',mute:'#8a8a94',b0:'#f2dcd8',b1:'#eccbc6',b2:'#e5bab3',bl:'#c24a44',bs:'fill',bw:.5,green:'#dbe8dc',tree:'#3f7a55',water:'#2456a6',ta:.6,ts:1,ws:2},
+ {id:'poster-rojo',fam:'Red buildings',name:'Póster: línea roja y marino',bg:'#ffffff',grid:'#efefef',gridk:'#dadada',ink:'#151a24',mute:'#858585',b0:'#ffffff',b1:'#ffffff',b2:'#ffffff',bl:'#b8433d',bs:'line',bw:.3,green:'#edf2e6',tree:'#6d9a63',water:'#1d4f86',ta:.5,ts:1,ws:2},
+ {id:'eucalipto-niebla',fam:'Eucalipto',name:'Eucalipto · niebla',bg:'#f6f8f8',grid:'#eaeff0',gridk:'#d9e1e3',ink:'#22333a',mute:'#8b989d',b0:'#eaeff0',b1:'#e2e8ea',b2:'#d9e0e3',green:'#e0ece7',tree:'#7aa89a',water:'#2f5363',ta:.65,ts:1,ws:1.5,bl:'#d9e0e3',bs:'fill',bw:.5},
+ {id:'aarslev-rojo',fam:'Referencia',name:'Referencia · árboles rojos',bg:'#ffffff',grid:'#ededed',gridk:'#d9d9d9',ink:'#1b1b1b',mute:'#7f7f7f',b0:'#f1f1f1',b1:'#eaeaea',b2:'#e3e3e3',green:'#f6ecea',tree:'#c45a55',water:'#1b1b1b',ta:.6,ts:1,ws:2,bl:'#e3e3e3',bs:'fill',bw:.5},
+ {id:'actual',fam:'Earlier',name:'Plan blanco · current',bg:'#ffffff',grid:'#efefed',gridk:'#dfdfdc',ink:'#1f1f1f',mute:'#8b8b88',b0:'#f0efec',b1:'#e9e8e4',b2:'#e3e2de',green:'#dbe7d6',tree:'#5f8a5f',water:'#dde7ea',ta:.6,ts:1,ws:0,bl:'#e3e2de',bs:'fill',bw:.5},
+];
+const KEY='lnu-palettes-v1';
+let pal,sel,showTrees=true,showPhoto=true,large=false,starOnly=false,D=null;
+try{pal=JSON.parse(localStorage.getItem(KEY))}catch(e){}
+if(!Array.isArray(pal)||!pal.length)pal=structuredClone(PROPOSALS);
+else{const ids=new Set(PROPOSALS.map(q=>q.id)),old=new Set(['salvia','olivo','mono','noche','musgo','musgo-tinta','musgo-blanco','musgo-profundo','eucalipto','eucalipto-hondo','eucalipto-tinta','aarslev-musgo']);
+  const mine=pal.filter(q=>!ids.has(q.id)&&!old.has(q.id)),kept=Object.fromEntries(pal.filter(q=>ids.has(q.id)).map(q=>[q.id,q]));
+  pal=[...PROPOSALS.map(q=>kept[q.id]?{bl:q.b2,bs:'fill',bw:.5,...q,...kept[q.id],fam:q.fam,ws:kept[q.id].ws??q.ws}:structuredClone(q)),...mine.map(q=>({ws:0,bl:q.b2,bs:'fill',bw:.5,...q,fam:q.fam||'Your variants'}))]}
+sel=pal[0].id;
+const save=()=>{try{localStorage.setItem(KEY,JSON.stringify(pal))}catch(e){}};
+const $=id=>document.getElementById(id);
+const esc=s=>String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const toast=t=>{const e=$('toast');e.textContent=t;e.classList.add('on');clearTimeout(toast.h);toast.h=setTimeout(()=>e.classList.remove('on'),1600)};
+
+/* ---------- data: crop of the real map ---------- */
+function paths(list,close){const p=new Path2D();for(const d of list){let x=0,y=0;for(let i=0;i<d.length;i+=2){x+=d[i];y+=d[i+1];i?p.lineTo(x,y):p.moveTo(x,y)}if(close)p.closePath()}return p}
+async function getJSON(u){let last;for(let i=0;i<4;i++){try{const r=await fetch(u,{cache:'no-store'});if(!r.ok)throw new Error(u+' answered '+r.status);
+    const t=await r.text();try{return JSON.parse(t)}catch(e){throw new Error(u+' is not readable data ('+t.slice(0,40).replace(/\s+/g,' ')+'…)')}}
+  catch(e){last=e;await new Promise(r=>setTimeout(r,600*(i+1)))}}throw last}
+async function load(){const el=document.getElementById('crop-data'),c=el?JSON.parse(el.textContent):await getJSON('data/crop.json'),[X0,Y0,X1,Y1]=c.box;
+  return {W:X1-X0,H:Y1-Y0,X0,Y0,bld:c.buildings.map(b=>paths(b,true)),green:paths(c.green,true),water:paths(c.water,true),t:new Float32Array(c.trees)}}
+
+/* ---------- render one palette into a canvas ---------- */
+function draw(cv,p){
+  const r=cv.getBoundingClientRect(),dpr=devicePixelRatio||1;if(!r.width)return;cv.width=r.width*dpr;cv.height=r.height*dpr;
+  const g=cv.getContext('2d'),s=r.width/D.W;g.setTransform(dpr,0,0,dpr,0,0);g.fillStyle=p.bg;g.fillRect(0,0,r.width,r.height);
+  g.setTransform(dpr*s,0,0,-dpr*s,0,dpr*r.height);
+  g.fillStyle=p.green;g.fill(D.green);
+  const bs=p.bs||'fill';if(bs!=='line')D.bld.forEach((b,i)=>{g.fillStyle=p['b'+i];g.fill(b,'evenodd')});
+  if(bs!=='fill'){g.strokeStyle=p.bl;g.lineWidth=(p.bw||.5)/s;g.lineJoin='round';D.bld.forEach(b=>g.stroke(b))}
+  g.fillStyle=p.water;g.fill(D.water);if(p.ws>0){g.strokeStyle=p.water;g.lineJoin='round';g.lineWidth=p.ws/s;g.stroke(D.water)}
+  const lines=(step,c)=>{g.strokeStyle=c;g.lineWidth=1/s;g.beginPath();const ox=(-D.X0)%step,oy=(-D.Y0)%step;
+    for(let x=(ox+step)%step;x<=D.W;x+=step){g.moveTo(x,0);g.lineTo(x,D.H)}for(let y=(oy+step)%step;y<=D.H;y+=step){g.moveTo(0,y);g.lineTo(D.W,y)}g.stroke()};
+  lines(250,p.grid);lines(1000,p.gridk);
+  g.setTransform(dpr,0,0,dpr,0,0);
+  if(showTrees){g.fillStyle=p.tree;g.globalAlpha=p.ta;const t=D.t,H=r.height;g.beginPath();
+    for(let i=0;i<t.length;i+=3){const X=t[i]*s,Y=H-t[i+1]*s,rad=Math.max(.75,(1.2+t[i+2]/4*.28)*s*1.6)*p.ts;g.moveTo(X+rad,Y);g.arc(X,Y,rad,0,6.2832)}
+    g.fill();g.globalAlpha=1}
+  if(showPhoto){ // a photo square at Plaza Mayor: 1 km, snapped to the 500 m sub-grid, as on the map
+    const x0=(-1500-D.X0)*s,y0=r.height-(-500+1000-D.Y0)*s,z=1000*s;
+    g.strokeStyle=p.ink;g.lineWidth=1.25;g.strokeRect(x0,y0,z,z);g.fillStyle=p.ink;g.font=`300 ${Math.max(15,Math.min(40,z*.24))}px Fraunces,Georgia,serif`;g.textAlign='center';g.textBaseline='middle';g.fillText('3',x0+z/2,y0+z/2)}
+}
+
+/* ---------- cards ---------- */
+const swatchKeys=['bg','b0','b1','b2','green','tree','water','ink'];
+function renderGrid(){
+  const list=pal.filter(p=>!starOnly||p.star),m=$('grid');m.className=large?'large':'';
+  let fam=null;const head=p=>{const f=p.fam||'Your variants';if(f===fam)return '';fam=f;return `<h2 class="fam">${esc(f)}</h2>`};
+  m.innerHTML=list.length?list.map(p=>head(p)+`<div class="card${p.id===sel?' on':''}" data-id="${esc(p.id)}" tabindex="0" role="button" aria-label="Edit ${esc(p.name)}">
+    <div class="fig"><canvas></canvas>${PROPOSALS.some(q=>q.id===p.id)?'':'<span class="tag">your variant</span>'}</div>
+    <div class="meta"><span class="name">${esc(p.name)}</span><span class="sw">${swatchKeys.map(k=>`<i style="background:${esc(p[k])}" title="${k}"></i>`).join('')}</span>
+    <button class="star" data-star="${esc(p.id)}" aria-pressed="${!!p.star}" aria-label="Star ${esc(p.name)}">★</button></div></div>`).join('')
+    :'<div class="load">No starred palettes yet. Star the ones you like with ★.</div>';
+  m.querySelectorAll('.card').forEach(c=>draw(c.querySelector('canvas'),pal.find(p=>p.id===c.dataset.id)));
+}
+function redrawOne(id){const c=document.querySelector(`.card[data-id="${CSS.escape(id)}"]`);if(!c)return;const p=pal.find(q=>q.id===id);draw(c.querySelector('canvas'),p);
+  c.querySelector('.sw').innerHTML=swatchKeys.map(k=>`<i style="background:${esc(p[k])}" title="${k}"></i>`).join('');c.querySelector('.name').textContent=p.name}
+
+/* ---------- editor ---------- */
+function renderEd(){
+  const p=pal.find(q=>q.id===sel);if(!p){$('ed').innerHTML='';return}
+  $('ed').innerHTML=`<h2>Edit palette</h2><p class="hint">Changes draw live on its card. Click any card to edit it instead.</p>
+    <input type="text" id="eName" value="${esc(p.name)}" aria-label="Palette name">
+    <div class="roles">${ROLES.map(([grp,rs])=>`<span class="grp">${grp}</span>`+rs.map(([k,l])=>`<input type="color" data-k="${k}" value="${esc(p[k])}" aria-label="${l}"><span>${l}</span><input class="hex" data-k="${k}" value="${esc(p[k])}" aria-label="${l} hex">`).join('')).join('')}</div>
+    <label class="slider">Tree opacity<span id="vTa">${Math.round(p.ta*100)}%</span><input type="range" id="eTa" min="10" max="100" value="${Math.round(p.ta*100)}"></label>
+    <label class="slider">Tree dot size<span id="vTs">${p.ts.toFixed(1)}×</span><input type="range" id="eTs" min="5" max="30" value="${Math.round(p.ts*10)}"></label>
+    <div class="slider">Building style<span></span><div class="row" style="grid-column:1/-1;margin-top:4px" id="eBs">${['fill','line','both'].map(v=>`<button data-bs="${v}" aria-pressed="${(p.bs||'fill')===v}">${{fill:'Filled',line:'Outline',both:'Both'}[v]}</button>`).join('')}</div></div>
+    <label class="slider">Building outline<span id="vBw">${(p.bw||.5).toFixed(2)} px</span><input type="range" id="eBw" min="5" max="150" value="${Math.round((p.bw||.5)*100)}"></label>
+    <label class="slider">Water outline<span id="vWs">${(p.ws||0).toFixed(1)} px</span><input type="range" id="eWs" min="0" max="40" value="${Math.round((p.ws||0)*10)}"></label>
+    <div class="row"><button id="eDup">Duplicate</button><button id="eTint">Parks from tree</button><button id="eCopy">Copy values</button>${pal.length>1?'<button id="eDel">Delete</button>':''}</div>
+    <textarea id="eOut" readonly aria-label="Palette values">${esc(JSON.stringify(out(p),null,1))}</textarea>
+    <p class="hint" style="margin-top:8px">“Parks from tree” sets the parks to a light tint of the tree colour. Paste the values in the chat, or tell me the palette’s name, and I’ll apply it to the map.</p>`;
+  const set=(k,v)=>{p[k]=v;save();redrawOne(p.id);$('eOut').value=JSON.stringify(out(p),null,1)};
+  $('ed').querySelectorAll('input[type=color]').forEach(i=>i.oninput=()=>{set(i.dataset.k,i.value);$('ed').querySelector(`.hex[data-k="${i.dataset.k}"]`).value=i.value});
+  $('ed').querySelectorAll('.hex').forEach(i=>i.onchange=()=>{const v=i.value.trim();if(/^#[0-9a-f]{6}$/i.test(v)){set(i.dataset.k,v.toLowerCase());$('ed').querySelector(`input[type=color][data-k="${i.dataset.k}"]`).value=v}else i.value=p[i.dataset.k]});
+  $('eName').oninput=e=>set('name',e.target.value||'Untitled');
+  $('eTa').oninput=e=>{set('ta',e.target.value/100);$('vTa').textContent=e.target.value+'%'};
+  $('eBs').onclick=e=>{const b=e.target.closest('[data-bs]');if(!b)return;set('bs',b.dataset.bs);$('eBs').querySelectorAll('button').forEach(x=>x.setAttribute('aria-pressed',x===b))};
+  $('eBw').oninput=e=>{set('bw',e.target.value/100);$('vBw').textContent=(e.target.value/100).toFixed(2)+' px'};
+  $('eWs').oninput=e=>{set('ws',e.target.value/10);$('vWs').textContent=(e.target.value/10).toFixed(1)+' px'};
+  $('eTs').oninput=e=>{set('ts',e.target.value/10);$('vTs').textContent=(e.target.value/10).toFixed(1)+'×'};
+  $('eDup').onclick=()=>{const n={...structuredClone(p),id:'v'+Date.now(),name:p.name+' · variant',star:false,fam:'Your variants'};pal.splice(pal.indexOf(p)+1,0,n);sel=n.id;save();renderGrid();renderEd()};
+  $('eTint').onclick=()=>{set('green',mix(p.tree,p.bg,.78));renderEd()};
+  $('eCopy').onclick=async()=>{try{await navigator.clipboard.writeText($('eOut').value);toast('Palette values copied')}catch(e){$('eOut').select();toast('Select and copy the values below')}};
+  const del=$('eDel');if(del)del.onclick=()=>{pal=pal.filter(q=>q!==p);sel=pal[0].id;save();renderGrid();renderEd()};
+}
+const out=p=>{const o={name:p.name};for(const [,rs] of ROLES)for(const [k] of rs)o[k]=p[k];o.treeOpacity=p.ta;o.treeSize=p.ts;o.waterOutline=p.ws;o.buildingStyle=p.bs||'fill';o.buildingOutline=p.bw||.5;return o};
+function mix(a,b,t){const h=c=>[1,3,5].map(i=>parseInt(c.slice(i,i+2),16)),A=h(a),B=h(b);return '#'+A.map((v,i)=>Math.round(v+(B[i]-v)*t).toString(16).padStart(2,'0')).join('')}
+
+/* ---------- events ---------- */
+$('grid').addEventListener('click',e=>{const st=e.target.closest('[data-star]');if(st){const p=pal.find(q=>q.id===st.dataset.star);p.star=!p.star;save();renderGrid();return}
+  const c=e.target.closest('.card');if(c){sel=c.dataset.id;document.querySelectorAll('.card').forEach(x=>x.classList.toggle('on',x===c));renderEd()}});
+$('grid').addEventListener('keydown',e=>{if((e.key==='Enter'||e.key===' ')&&e.target.classList.contains('card')){e.preventDefault();e.target.click()}});
+const tog=(id,f)=>$(id).onclick=()=>{const v=f();$(id).setAttribute('aria-pressed',v);renderGrid()};
+tog('bTrees',()=>showTrees=!showTrees);tog('bPhoto',()=>showPhoto=!showPhoto);tog('bLarge',()=>large=!large);tog('bStar',()=>starOnly=!starOnly);
+$('bReset').onclick=()=>{pal=structuredClone(PROPOSALS);sel=pal[0].id;save();renderGrid();renderEd();toast('Back to the proposed palettes')};
+let rt;const ro=new ResizeObserver(()=>{clearTimeout(rt);rt=setTimeout(()=>D&&renderGrid(),120)});ro.observe($('grid'));
+
+load().then(async d=>{D=d;try{await document.fonts.load('300 20px Fraunces')}catch(e){}
+  try{renderGrid();renderEd()}catch(e){$('grid').innerHTML=`<div class="load">The map crop loaded but could not be drawn: ${esc(e.message)}</div>`}})
+ .catch(e=>{$('grid').innerHTML=`<div class="load">Could not load the map crop: ${esc(e.message)}. Reload the page to try again.</div>`});
+}
+</script>
+</body>
+</html>
