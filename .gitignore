@@ -20,3 +20,4 @@ node_modules/
 
 # proposals downloaded for review (scripts/propuestas.mjs importar)
 db/propuestas/
+.vercel

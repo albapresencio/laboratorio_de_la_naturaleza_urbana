@@ -1,0 +1,7 @@
+# Deploy only the site (web/), the proposal function (api/) and its Node dependencies; db/, scripts/ and the rest stay in git.
+/*
+!/web
+!/api
+!/package.json
+!/package-lock.json
+!/vercel.json
