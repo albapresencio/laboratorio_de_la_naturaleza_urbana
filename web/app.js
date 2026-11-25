@@ -6,7 +6,7 @@
 'use strict';
 const {useState,useEffect,useLayoutEffect,useRef,useCallback}=React;
 const html=htm.bind(React.createElement);
-const KM=1000, STEPS=[1000,500,250,100,50], PHOTO_PX=110;
+const KM=1000, STEPS=[1000,500,250,100,50], PHOTO_PX=110, ROTATE=8000;
 const FONT='"Courier Prime","Courier New",Courier,monospace'; // one typewriter face for everything, canvas included
 const REDUCED=matchMedia('(prefers-reduced-motion: reduce)').matches;
 // grid refines as you zoom: the coarsest step whose square is no bigger than ~2 photo footprints
@@ -107,9 +107,10 @@ function Pic({src,eq,cls,alt,style}){const [out,setOut]=useState(null);
   useEffect(()=>{let live=true;setOut(null);if(eq)equalize(src).then(u=>live&&setOut(u));return()=>{live=false}},[src,eq]);
   return html`<img src=${eq&&out?out:src} class=${cls} style=${style} alt=${alt||''} draggable="false"/>`}
 // a card's versions: the first shows; while the card is lit they take turns, cross-fading
+const yearTag=p=>html`<span class="yr">${p.year||'s/f'}</span>`;   // every photo shows its year ("sin fecha" if unknown)
 function Cycle({photos,eq,on}){const [k,setK]=useState(0);
   useEffect(()=>{if(!on){setK(0);return}setK(1%photos.length);const iv=setInterval(()=>setK(x=>(x+1)%photos.length),1300);return()=>clearInterval(iv)},[on,photos.length]);
-  return photos.map((p,i)=>html`<${Pic} key=${p.src} cls=${'v'+(i===k?' on':'')} src=${p.src} eq=${eq}/>`)}
+  return html`${photos.map((p,i)=>html`<${Pic} key=${p.src} cls=${'v'+(i===k?' on':'')} src=${p.src} eq=${eq}/>`)}${yearTag(photos[k])}`}
 
 /* sound: one plays at a time; the waveform is the file's own, decoded once */
 const peaksCache=new Map();let playing=null;
@@ -155,7 +156,7 @@ function shapes(it,big){
   if(it.type==='audio')return [[2,1],[1,1]];
   return [[1,1]]}
 const GUT=5;
-// ctx: {U (square side, m), ox,oy (grid origin, m), v, bw,bh, avoid, blocked(i,j), reach, occ:Set, dirs:Map}
+// ctx: {U (square side, m), ox,oy (grid origin, m), v, bw,bh, avoid, blocked(i,j), reach, occ:Set, dirs:Map, air (keep a square free around each card)}
 function packOne(L,ctx){const {U,ox,oy,v,bw,bh,avoid,blocked,reach,occ,dirs}=ctx;
   for(const [w,h] of L.shapes){let best=null;
     for(let i=L.ai-reach-w+1;i<=L.ai+reach;i++)for(let j=L.aj-reach-h+1;j<=L.aj+reach;j++){
@@ -166,7 +167,7 @@ function packOne(L,ctx){const {U,ox,oy,v,bw,bh,avoid,blocked,reach,occ,dirs}=ctx
       const cx=i+w/2-(L.ai+.5),cy=j+h/2-(L.aj+.5),oct=(Math.round(Math.atan2(cy,cx)/(Math.PI/4))+8)%8;
       const sc=Math.hypot(cx,cy)+1.1*(dirs.get(L.anchorKey+oct)||0)+.6*hash(L.key+'|'+i+','+j);
       if(!best||sc<best.sc)best={sc,i,j,w,h,left,top,W,H,oct}}
-    if(best){for(let a=0;a<best.w;a++)for(let b=0;b<best.h;b++)occ.add((best.i+a)+','+(best.j+b));
+    if(best){const m=ctx.air?1:0;for(let a=-m;a<best.w+m;a++)for(let b=-m;b<best.h+m;b++)occ.add((best.i+a)+','+(best.j+b));
       dirs.set(L.anchorKey+best.oct,(dirs.get(L.anchorKey+best.oct)||0)+1);return {...L,...best}}}
   return null}
 // the hairline from a card to a point (screen px): it leaves the card at the edge point nearest to it
@@ -177,8 +178,10 @@ function MapView({D,layers,cases,onOpen,paused,pick,onPick,mark,children}){
   const box=useRef(),cv=useRef(),under=useRef(),over=useRef(),view=useRef(null),[tick,setTick]=useState(0),[hover,setHover]=useState(null),[wipe,setWipe]=useState(.5),[intro,setIntro]=useState(false),drag=useRef(null);
   const [pin,setPin]=useState(null),[page,setPage]=useState(0),entering=useRef(false),lastW=useRef(.5),anim=useRef();
   const [lit,setLit]=useState(null),avoid=useRef({s:'',a:[]});
+  const [cards,setCards]=useState([]),recent=useRef([]),unplaced=useRef([]),noRoom=useRef({tick:-1,ids:new Set()});
   /* The base map is expensive to draw (every building), so it is drawn only once the view settles: while panning or zooming,
-     the last drawing is moved and scaled with a CSS transform. Moves are batched to one per frame. */
+     the last drawing is moved and scaled with a CSS transform. Moves are batched to one per frame, and the floating cards
+     step aside while the map moves and return after a pause. */
   const [drawTick,setDrawTick]=useState(0),[moving,setMoving]=useState(false),drawn=useRef(null),raf=useRef(0),settle=useRef();
   const kick=()=>{if(!raf.current)raf.current=requestAnimationFrame(()=>{raf.current=0;setTick(t=>t+1)});
     setMoving(true);clearTimeout(settle.current);settle.current=setTimeout(()=>setMoving(false),650)};
@@ -254,6 +257,28 @@ function MapView({D,layers,cases,onOpen,paused,pick,onPick,mark,children}){
     const bb=box.current.getBoundingClientRect(),r=el.getBoundingClientRect();setLit(null);
     openTile(T,id,item==null?leadIndex(c):item,{left:r.left-bb.left,top:r.top-bb.top,width:r.width,height:r.height})};
 
+  /* ---- floating cards: a few photos from the cases in view, filed near their squares, one replaced every ROTATE ms.
+     Only cases that have a square at this zoom take part; the cards step aside while a square is hovered or pinned. ---- */
+  const wanted=()=>{const w=box.current.getBoundingClientRect().width;return w<640?1:w<1100?2:3};
+  const shown=new Set(Object.values(tiles).flatMap(t=>t.ids));
+  const inView=()=>{const v=view.current,b=box.current.getBoundingClientRect();
+    return [...shown].filter(id=>{const c=cases[id],X=v.tx+c.x*v.s,Y=v.ty-c.y*v.s;return X>24&&X<b.width-24&&Y>24&&Y<b.height-24})};
+  const cardKey=cards.map(c=>c.id+(c.out?'~':'')).join();
+  useEffect(()=>{ // keep a few cards for cases in view: drop those that left (or found no room), draw new ones at random
+    if(!view.current||drag.current||moving)return;
+    if(noRoom.current.tick!==tick)noRoom.current={tick,ids:new Set()};for(const id of unplaced.current)noRoom.current.ids.add(id);
+    const vis=new Set(inView()),K=wanted(),bad=noRoom.current.ids;
+    setCards(cs=>{let n=cs.filter(c=>vis.has(c.id)&&!(bad.has(c.id)&&!c.out));const have=new Set(n.map(c=>c.id));
+      const pool=[...vis].filter(id=>!have.has(id)&&!bad.has(id)),fresh=pool.filter(id=>!recent.current.includes(id)),src=fresh.length?fresh:pool;
+      let k=0;while(n.filter(c=>!c.out).length<K&&src.length){const id=src.splice(Math.floor(Math.random()*src.length),1)[0];n=[...n,{id,t:Date.now(),d:k++*.18}]}
+      while(n.filter(c=>!c.out).length>K){const i=n.findIndex(c=>!c.out);n=n.filter((_,j)=>j!==i)}
+      return n.map(c=>c.id).join()===cs.map(c=>c.id).join()?cs:n});
+  },[tick,cases,cardKey,moving]);
+  const retire=()=>{setCards(cs=>{const live=cs.filter(c=>!c.out);if(!live.length)return cs;const go=live.reduce((a,b)=>a.t<b.t?a:b);
+      recent.current=[go.id,...recent.current].slice(0,8);return cs.map(c=>c===go?{...c,out:true}:c)});
+    setTimeout(()=>setCards(cs=>cs.filter(c=>!c.out)),520)};
+  const hold=useRef();hold.current=paused||focus||lit||moving||drag.current||(playing&&!playing.paused);
+  useEffect(()=>{if(REDUCED)return;const iv=setInterval(()=>{if(!document.hidden&&!hold.current)retire()},ROTATE);return()=>clearInterval(iv)},[]);
   // the controls: cards keep clear of them (re-measured after each render, re-laid out if they moved)
   useLayoutEffect(()=>{const bb=box.current.getBoundingClientRect();
     const a=[...box.current.querySelectorAll('.legend,.tools,.title')].map(el=>{const r=el.getBoundingClientRect();return {left:r.left-bb.left,top:r.top-bb.top,right:r.right-bb.left,bottom:r.bottom-bb.top}});
@@ -265,6 +290,13 @@ function MapView({D,layers,cases,onOpen,paused,pick,onPick,mark,children}){
 
   /* ---- layout ---- */
   const bsz=v&&box.current.getBoundingClientRect(),base=v&&{v,bw:bsz.width,bh:bsz.height,avoid:avoid.current.a};
+  const idle=[];
+  if(v&&!moving){const B=G.B,ctx={...base,U:B,ox:-D.W,oy:-D.H,occ:new Set(),dirs:new Map(),air:true,reach:3,
+      blocked:(i,j)=>!!tiles[i+','+j]||i<0||j<0||(i+1)*B>2*D.W||(j+1)*B>2*D.H};   // off the squares, inside the grid
+    for(const cd of cards){const c=cases[cd.id];if(!c)continue;const [ai,aj]=tileOf(D,B,c.x,c.y),li=leadIndex(c);
+      const r=packOne({key:cd.id,ai,aj,anchorKey:cd.id,shapes:shapes(c.items[li],false),id:c.id,item:li},ctx);
+      if(r)idle.push({...r,cd})}}
+  if(!moving)unplaced.current=cards.filter(c=>!c.out&&!idle.some(r=>r.id===c.id)).map(c=>c.id);
   // a pinned square lays out all its files around it, a page at a time, a square of air around it and never outside the frame
   let plot=[],pages=1,pg=0;
   if(v&&pin){const F=pin,all=[];const cs=F.ids.map(id=>cases[id]).filter(Boolean),li=cs.map(leadIndex);
@@ -297,12 +329,12 @@ function MapView({D,layers,cases,onOpen,paused,pick,onPick,mark,children}){
     return html`<div key=${isPin?'pin':g.key} class=${'blk'+(on?' on':'')+(isPin?' pin':'')+(on&&intro&&!isPin?' intro':'')} style=${{...rect(g),'--w':(on?wipe:.5)*100+'%'}}>
       <i class="lift"></i>
       ${on&&html`<div class="orth"><${Ortho} D=${D} b=${b} which="after" size=${z} cls="now"/><${Ortho} D=${D} b=${b} which="before" size=${z} cls="bf"/><i class="seam"></i>
-        ${on&&z>90&&html`<span class="tg" style=${{left:4}}>1956</span><span class="tg" style=${{right:4}}>hoy</span>`}</div>`}
+        ${on&&z>90&&html`<span class="tg" style=${{left:4}}>orto. 1956</span><span class="tg" style=${{right:4}}>orto. hoy</span>`}</div>`}
       <div class="mark"></div><span class="count" style=${{fontSize:Math.max(15,Math.min(40,z*.24))}} aria-label=${n+(n>1?' casos':' caso')}>${n}</span>
       ${isPin&&html`<span class="corners" aria-hidden="true"><i></i><i></i><i></i><i></i></span>`}
       ${on&&html`<div class="tab">${squareName(D,g)}</div>`}</div>`};
   const media=(c,it,on)=>{const snd=it.type!=='audio'&&c.items.find(x=>x.type==='audio');
-    return firstSrc(it)?html`<div class="media">${it.type==='versions'?html`<${Cycle} photos=${it.photos} eq=${layers.bw} on=${on}/>`:html`<${Pic} src=${it.src} eq=${layers.bw}/>`}${snd&&html`<${Sound} src=${snd.src} label=${snd.label} variant="dot"/>`}</div>`
+    return firstSrc(it)?html`<div class="media">${it.type==='versions'?html`<${Cycle} photos=${it.photos} eq=${layers.bw} on=${on}/>`:html`<${Pic} src=${it.src} eq=${layers.bw}/>${yearTag(it)}`}${snd&&html`<${Sound} src=${snd.src} label=${snd.label} variant="dot"/>`}</div>`
       :it.type==='audio'?html`<div class="media snd"><${Sound} src=${it.src} label=${it.label} variant="mini"/></div>`
       :it.type==='text'?html`<div class="media txt"><p>${it.body}</p></div>`
       :html`<div class="media file"><b>▤</b>${ext(it.src)}</div>`};
@@ -319,10 +351,12 @@ function MapView({D,layers,cases,onOpen,paused,pick,onPick,mark,children}){
     ${v&&Object.values(tiles).filter(g=>!(pin&&g.x0<pin.x0+pin.size&&g.x0+g.size>pin.x0&&g.y0<pin.y0+pin.size&&g.y0+g.size>pin.y0)).map(g=>tileEl(g,!pin&&hover===g.key,false))}
     ${v&&pin&&tileEl(pin,true,true)}
     ${v&&html`<svg class="leads" aria-hidden="true">
+      ${idle.map(r=>{const c=cases[r.id],[x1,y1,x2,y2]=leaderTo(r,v.tx+c.x*v.s,v.ty-c.y*v.s);return html`<g key=${'i'+r.key} class=${'idle'+(r.cd.out?' out':'')+(lit===r.key?' lit':'')} style=${{'--d':r.cd.d+'s'}}><line pathLength="1" x1=${x1} y1=${y1} x2=${x2} y2=${y2}/></g>`})}
       ${plot.map((r,k)=>{const c=cases[r.id],[x1,y1,x2,y2]=leaderTo(r,v.tx+c.x*v.s,v.ty-c.y*v.s);return html`<g key=${'p'+r.key} class=${lit==='p'+r.key?'lit':''} style=${{'--d':.25+k*.07+'s'}}><line pathLength="1" x1=${x1} y1=${y1} x2=${x2} y2=${y2}/></g>`})}
       ${pin&&pin.ids.map(id=>{const c=cases[id];if(!c)return null;const on=lit&&lit.slice(1).startsWith('f'+id+'.'),X=v.tx+c.x*v.s,Y=v.ty-c.y*v.s;
         return html`<g key=${'d'+id}>${c.r>0&&html`<circle class="unc" cx=${X} cy=${Y} r=${c.r*v.s}/>`}<circle class=${'dot'+(on?' lit':'')} cx=${X} cy=${Y} r="3.5"/></g>`})}
       ${mark&&(()=>{const X=v.tx+mark.x*v.s,Y=v.ty-mark.y*v.s;return html`<g class="mark">${mark.r>0&&html`<circle class="unc" cx=${X} cy=${Y} r=${mark.r*v.s}/>`}<circle class="pm" cx=${X} cy=${Y} r="6"/></g>`})()}</svg>`}
+    ${idle.map(r=>cardEl(r,'idle'+(r.cd.out?' out':''),r.cd.d,itemName(cases[r.id].items[r.item]),r.item))}
     ${plot.map((r,k)=>cardEl({...r,key:'p'+r.key},'',.25+k*.07,itemName(cases[r.id].items[r.item]),r.item))}
     ${pin&&pages>1&&html`<div class="pager" style=${{left:FR.left+FR.width/2,top:FR.top+FR.height+12}} onPointerDown=${e=>e.stopPropagation()} onPointerUp=${e=>e.stopPropagation()}>
       <button aria-label="Anteriores" onClick=${()=>setPage(p=>p-1)}>‹</button><span>${pg+1} / ${pages}</span><button aria-label="Siguientes" onClick=${()=>setPage(p=>p+1)}>›</button></div>`}
@@ -368,32 +402,22 @@ function LensMap({D,cases,tile,sel,aside}){
       ${(()=>{const [X,Y]=S(tile.x0,tile.y0+tile.size);return html`<rect class="sq" x=${X} y=${Y} width=${tile.size/vw.mpp} height=${tile.size/vw.mpp}/>`})()}
       ${c0&&(()=>{const [X,Y]=S(c0.x,c0.y);return html`${c0.r>0&&html`<circle class="unc" cx=${X} cy=${Y} r=${c0.r/vw.mpp}/>`}<circle class="cs" cx=${X} cy=${Y} r="4.5"/>`})()}
       <circle class="lring" cx=${lx} cy=${ly} r=${lr}/></svg>
-    <span class="ltag" style=${{left:lx,top:ly-lr}}>1956–57</span>
+    <span class="ltag" style=${{left:lx,top:ly-lr}}>ortofoto 1956–57</span>
     ${c0&&(()=>{const [X,Y]=S(c0.x,c0.y);return html`<span class="cname" style=${{left:X+10,top:Y}}>${c0.title}</span>`})()}
-    <div class="bar"><label class="chip">1956 <input type="range" min="40" max="1200" step="10" value=${rad} aria-label="Tamaño de la lente de 1956" onInput=${e=>setRad(+e.target.value)} onPointerDown=${e=>e.stopPropagation()}/></label></div></div>`}
+    <div class="bar"><span class="chip note">Fondo: ortofoto actual · lente: 1956–57. No coinciden necesariamente con el año de las fotos.</span>
+      <label class="chip">1956 <input type="range" min="40" max="1200" step="10" value=${rad} aria-label="Tamaño de la lente de 1956" onInput=${e=>setRad(+e.target.value)} onPointerDown=${e=>e.stopPropagation()}/></label></div></div>`}
 
-// one item on the stage, floating over the map: a photo, its versions (side by side, a divider between each), a text, a sound or a file
+// one item on the stage, floating over the map: a photo, its versions (side by side), a text, a sound or a file
 const photoCap=p=>html`<span>${p.v&&html`<b>${p.v}</b> `}${p.label}${p.credit&&html` <i>· ${p.credit}</i>`}${p.link&&html` <a href=${p.link} target="_blank" rel="noopener" title="Original">↗</a>`}</span>`;
+// a case's versions side by side, each with its letter and caption
 function Versions({c,P,eq}){
-  const n=P.length,[ws,setWs]=useState(()=>P.slice(1).map((_,i)=>100*(i+1)/n)),fr=useRef(),grab=useRef(0);
-  useEffect(()=>setWs(P.slice(1).map((_,i)=>100*(i+1)/n)),[P]);
-  const pos=e=>{const b=fr.current.getBoundingClientRect();return (e.clientX-b.left)/b.width*100};
-  const move=(i,x)=>setWs(w=>{const o=[...w];o[i]=Math.max(i?o[i-1]+2:0,Math.min(i<o.length-1?o[i+1]-2:100,x));return o});
-  const bands=[0,...ws,100];
-  return html`<div class="pic pair" ref=${fr} style=${{touchAction:'none'}}
-      onPointerDown=${e=>{if(e.target.closest('a'))return;e.currentTarget.setPointerCapture(e.pointerId);const x=pos(e);grab.current=ws.reduce((b,w,i)=>Math.abs(w-x)<Math.abs(ws[b]-x)?i:b,0);move(grab.current,x)}}
-      onPointerMove=${e=>{if(e.buttons)move(grab.current,pos(e))}}>
-    <${Pic} src=${P[n-1].src} eq=${eq} alt=${c.title+', '+P[n-1].label}/>
-    ${P.slice(0,-1).map((p,i)=>html`<${Pic} key=${p.src} cls="bf" src=${p.src} eq=${eq} alt=${c.title+', '+p.label} style=${{'--w':ws[i]+'%'}}/>`).reverse()}
-    ${ws.map((w,i)=>html`<i key=${'s'+i} class="seam" style=${{left:w+'%'}}></i><span key=${'k'+i} class="knob" style=${{left:w+'%'}} role="slider" tabIndex="0"
-      aria-label=${'Separador entre las versiones '+P[i].v+' y '+P[i+1].v} aria-valuenow=${Math.round(w)} aria-valuemin="0" aria-valuemax="100"
-      onKeyDown=${e=>{if(e.key==='ArrowLeft'||e.key==='ArrowRight'){e.stopPropagation();e.preventDefault();move(i,w+(e.key==='ArrowLeft'?-5:5))}}}>↔</span>`)}
-    ${P.map((p,i)=>bands[i+1]-bands[i]>8&&html`<span key=${'t'+i} class="tag vt" style=${{left:(bands[i]+bands[i+1])/2+'%'}}>${p.v}${p.credit?' · '+p.credit.split(' · ')[0]:''}</span>`)}</div>`}
+  return html`<div class="vers">${P.map(p=>html`<figure key=${p.src}><div class="pic"><${Pic} src=${p.src} eq=${eq} alt=${c.title+', '+p.label}/>${yearTag(p)}</div>
+    <figcaption>${photoCap(p)}</figcaption></figure>`)}</div>`}
 function Viewer({c,it,eq,onClose}){
   const head=html`<figcaption>${catNo(c)} · ${c.title}<button class="x" aria-label="Cerrar" onClick=${onClose}>×</button></figcaption>`;
   let body;
-  if(it.type==='versions')body=html`${head}<${Versions} c=${c} P=${it.photos} eq=${eq}/><div class="cap">${it.photos.map(p=>html`<p key=${p.src}>${photoCap(p)}</p>`)}</div>`;
-  else if(it.type==='photo')body=html`${head}<div class="pic"><${Pic} src=${it.src} eq=${eq} alt=${c.title+(it.label?', '+it.label:'')}/></div><div class="cap"><p>${photoCap(it)}</p></div>`;
+  if(it.type==='versions')body=html`${head}<${Versions} c=${c} P=${it.photos} eq=${eq}/>`;
+  else if(it.type==='photo')body=html`${head}<div class="pic"><${Pic} src=${it.src} eq=${eq} alt=${c.title+(it.label?', '+it.label:'')}/>${yearTag(it)}</div><div class="cap"><p>${photoCap(it)}</p></div>`;
   else if(it.type==='text')body=html`${head}<blockquote class="text"><small>${it.label||'Texto'}</small>${it.body}</blockquote>`;
   else if(it.type==='audio')body=html`${head}<div class="aud"><${Sound} src=${it.src} label=${it.label} variant="big"/><p>${it.label}</p></div>`;
   else body=html`${head}<div class="doc">${['txt','pdf','html','md'].includes(ext(it.src))&&html`<iframe src=${it.src} title=${it.label||'Documento'}></iframe>`}
@@ -423,7 +447,7 @@ function Explore({D,cases,open,eq,onClose}){
       <header><h2>${squareName(D,tile)}</h2><button class="close" aria-label="Cerrar" onClick=${close}>×</button></header>
       ${cs.map(c=>html`<section key=${c.id} class=${c.id===sel.id?'cur':''}>
         <button class="ch" onClick=${()=>setSel({id:c.id,item:null})}><span class="no">${catNo(c)}</span><b>${c.title}</b></button>
-        <small class="meta">${[c.date,where(c)].filter(Boolean).join(' · ')}${mapLink(c)&&html` <a href=${mapLink(c)} target="_blank" rel="noopener" title="Ver en Google Maps">↗</a>`}</small>
+        <small class="meta">${where(c)}${mapLink(c)&&html` <a href=${mapLink(c)} target="_blank" rel="noopener" title="Ver en Google Maps">↗</a>`}</small>
         ${c.items.map((x,i)=>html`<button key=${i} class=${'row'+(c.id===sel.id&&i===sel.item?' sel':'')} onClick=${()=>setSel({id:c.id,item:i})}>${thumb(x)}<span>${itemName(x)}</span></button>`)}
       </section>`)}
       <div class="info"><button class="i" aria-expanded=${info} aria-label="Información" onClick=${()=>setInfo(o=>!o)}>i</button>

@@ -60,13 +60,15 @@ body{margin:0;background:var(--bg);color:var(--ink);font:14px/1.45 var(--font);o
    Shape follows the content: wide photos span 2 x 1 or 3 x 2 squares, portraits 1 x 2 or 2 x 3, text is wide. A hairline runs to the square's edge. */
 .leads{position:absolute;inset:0;width:100%;height:100%;pointer-events:none;z-index:5;overflow:visible}
 .leads line{stroke:var(--ink);stroke-width:1;opacity:.4;stroke-dasharray:1;stroke-dashoffset:1;animation:lead .6s var(--ease) forwards;animation-delay:calc(var(--d,0s) + .4s);transition:opacity .25s}
-.leads g.lit line{opacity:1}
+.leads g.lit line{opacity:1}.leads g.out line{animation:none;opacity:0}
+.leads g.idle{transition:opacity .35s}.map.focus .leads g.idle{opacity:0}
 .leads .dot{fill:#fff;stroke:#1f1f1f;stroke-width:1.25;opacity:0;animation:fade .35s ease forwards;animation-delay:.5s;transition:r .2s}
 .leads .dot.lit{r:6px}
 .leads .unc,.lensmap .unc{fill:color-mix(in srgb,var(--ink) 6%,transparent);stroke:var(--ink);stroke-width:1;opacity:.35}
 .lensmap .unc{stroke:#fff;fill:rgb(255 255 255/.08);opacity:.9}
 @keyframes lead{to{stroke-dashoffset:0}}@keyframes fade{to{opacity:1}}
 .card{position:absolute;z-index:6;cursor:pointer;outline:none;transition:opacity .35s}
+.map.focus .card.idle{opacity:0;pointer-events:none}
 .card .sheet{position:absolute;inset:0;padding:4px;background:rgb(255 255 255/.55);border:1px solid #fff;-webkit-backdrop-filter:blur(3px);backdrop-filter:blur(3px);
   box-shadow:0 0 0 .5px rgb(0 0 0/.12),0 6px 18px rgb(0 0 0/.08);
   animation:file-in .75s var(--ease) both;animation-delay:var(--d,0s);transition:transform .3s var(--ease),box-shadow .3s}
@@ -78,7 +80,9 @@ body{margin:0;background:var(--bg);color:var(--ink);font:14px/1.45 var(--font);o
 .card.lit .sheet,.card:focus-visible .sheet{transform:translateY(-3px);box-shadow:0 0 0 .5px rgb(0 0 0/.12),0 14px 30px rgb(0 0 0/.18)}
 .card:focus-visible .sheet{outline:2px solid var(--tree);outline-offset:2px}
 @keyframes file-in{from{clip-path:inset(100% 0 0 0);transform:translateY(14px)}to{clip-path:inset(-40px);transform:none}}
-@keyframes rise{from{opacity:0;transform:translateY(4px)}}
+@keyframes rise{from{opacity:0;transform:translateY(4px)}}@keyframes sink{to{opacity:0}}
+.card.out .sheet{animation:file-out .5s var(--ease) both}.card.out .lab{animation:sink .2s ease both}
+@keyframes file-out{from{clip-path:inset(-40px);transform:none}to{clip-path:inset(100% 0 0 0);transform:translateY(14px)}}
 .media{position:relative;width:100%;height:100%;overflow:hidden;background:var(--b1)}
 .media img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;display:block;transition:opacity .6s}
 .media img.v{opacity:0}.media img.v.on{opacity:1}
@@ -124,13 +128,13 @@ body{margin:0;background:var(--bg);color:var(--ink);font:14px/1.45 var(--font);o
 .viewer figcaption .x{margin-left:auto;min-height:28px;min-width:28px;padding:0;font-size:18px;line-height:1}
 .viewer .pic{position:relative;display:inline-block;max-width:100%;line-height:0;align-self:center}
 .viewer .pic img{max-width:calc((100vw - 340px)*.6 - 44px);max-height:calc(100vh - 230px);display:block;user-select:none;-webkit-user-drag:none}
-.viewer .pic.pair{cursor:ew-resize;touch-action:none}
-.viewer .pic .bf{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;max-width:none;max-height:none;clip-path:inset(0 calc(100% - var(--w)) 0 0)}
-.viewer .seam{position:absolute;top:0;bottom:0;width:2px;margin-left:-1px;background:#fff;z-index:20}
-.viewer .knob{position:absolute;top:50%;width:34px;height:34px;margin:-17px 0 0 -17px;border-radius:50%;background:#fff;color:#1f1f1f;box-shadow:0 1px 6px rgb(0 0 0/.25);display:grid;place-items:center;font-size:13px;line-height:1;z-index:21;cursor:ew-resize}
-.viewer .knob:focus-visible{outline:2px solid var(--tree);outline-offset:2px}
 .viewer .tag{position:absolute;bottom:10px;padding:1px 7px;font-size:12px;line-height:1.5;background:rgb(255 255 255/.92);color:#1f1f1f;z-index:22}
-.viewer .tag.vt{transform:translateX(-50%);white-space:nowrap;max-width:30%;overflow:hidden;text-overflow:ellipsis}
+.viewer .vers{display:flex;gap:10px;align-items:flex-start;max-width:calc((100vw - 340px)*.6 - 44px)}
+.viewer .vers figure{margin:0;flex:1 1 0;min-width:0;display:flex;flex-direction:column;gap:6px}
+.viewer .vers .pic img{width:100%;height:auto;max-height:calc(100vh - 300px);object-fit:contain;max-width:100%}
+.viewer .vers figcaption{display:block;font-size:12px;line-height:1.4;color:var(--ink)}
+.viewer .vers figcaption b{font-weight:700;margin-right:4px}.viewer .vers figcaption i{color:var(--mute);font-style:normal}
+.viewer .vers figcaption a{color:var(--mute);text-decoration:none}
 .viewer .cap{max-width:calc((100vw - 340px)*.6 - 44px);font-size:13px;line-height:1.4}
 .viewer .cap p{margin:0 0 4px}.viewer .cap b{display:inline-block;min-width:1.3em;font-weight:600}.viewer .cap i{color:var(--mute);font-style:normal}
 .viewer .cap a{color:var(--mute);font-size:12px;white-space:nowrap}
@@ -201,3 +205,8 @@ button:hover{border-color:var(--frame)}button:focus-visible,input:focus-visible{
 .propose .hp{position:absolute;left:-9999px;width:1px;height:1px}
 .propose .err{margin:0;color:#b3261e}.propose .send{background:var(--ink);color:var(--bg);border-color:var(--ink)}
 .propose .note{margin:0;color:var(--mute);font-size:10px}
+
+/* a photo's year, on the photo */
+.yr{position:absolute;left:4px;top:4px;z-index:2;padding:0 5px;font-size:10px;line-height:1.6;background:rgb(255 255 255/.92);color:#1f1f1f;letter-spacing:.03em}
+.viewer .pic .yr{font-size:12px;left:6px;top:6px}
+.stage .chip.note{color:#55554f;font-size:11px}

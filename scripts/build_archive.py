@@ -66,7 +66,7 @@ COORD = re.compile(r'^\s*(-?\d+(?:\.\d+)?)\s*[,;\s]\s*(-?\d+(?:\.\d+)?)\s*$')
 NOTE = ('Archive cases, built from db/archivo_fotografias.xlsx by scripts/build_archive.py: do not edit by hand. '
         'Each case is geolocated: exact (lon/lat) or approximate (lon/lat + r in metres). '
         'loc says where the coordinate comes from: sheet (Coordenada), gps (photo metadata) or estimate (from Localización). '
-        'Items: versions {photos:[{src,label,credit,v}...]} (one photo in several versions), photo {src,label,credit}, '
+        'Items: versions {photos:[{src,label,year,credit,v}...]} (one photo in several versions), photo {src,label,year,credit}, '
         'text {body,label}, audio {src,label}, file {src,label}.')
 COLUMNS = {'id': 'identificador', 'version': 'version', 'year': 'ano', 'name': 'nombre imagen', 'source': 'archivo',
            'place': 'localizacion', 'coord': 'coordenada', 'link': 'enlaces', 'radius': 'radio (m)'}
@@ -276,9 +276,10 @@ def build_cases(rows, photos, rep, gps=None, approx=None):
                 continue
             used.add((n, r['_v']))
             item = {'type': 'photo', 'src': f, '_v': r['_v'], 'label': tidy(name)}
-            credit = ' · '.join(x for x in (year, source) if x)
-            if credit:
-                item['credit'] = credit
+            if year:
+                item['year'] = year                                     # shown on the photo itself
+            if source:
+                item['credit'] = source
             if text(r.get('link')):
                 item['link'] = text(r['link'])
             items.append(item)
