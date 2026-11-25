@@ -18,7 +18,8 @@ web/                   the site (static, no build step): index.html, app.js, app
   data/                map data: buildings.json, trees.json, osm.json (+ cases.json, generated)
   media/               generated from db/fotografias
   tiles/1956/          1956 orthophoto tile pyramid
-scripts/               data pipeline (Python)
+scripts/               data pipeline (Python) and the proposal review tools
+api/proponer.js        Vercel Function behind the map's "Proponer un caso" form
 palettes/              palette lab: the same map crop drawn in candidate palettes
 ```
 
@@ -34,8 +35,8 @@ python3 -m venv .venv
 1. Add a row per photo to `db/archivo_fotografias.xlsx`: Identificador, Versión (a, b, c…), Año, Nombre imagen,
    Archivo (source), Localización, Coordenada, Enlaces. The first Localización of a case is its title on the map.
 2. Save the photo in `db/fotografias/` as `<Identificador>-<versión>.jpg` (e.g. `6-c.jpg`); text after it is ignored.
-   The versions of a case are linked: on the map they take turns on the card, and the viewer compares any two
-   with a slider.
+   The versions of a case are linked: on the map they take turns on the card, and the viewer shows them side by
+   side with a divider between each.
 3. **Coordenada** puts the case on the map: `lat, lon` as Google Maps copies it (right-click a place → copy
    `40.43436, -3.63828`). Without one, a case uses the GPS of its photos if they had any (below);
    otherwise it is listed as a warning and left off the map.
@@ -58,6 +59,25 @@ has neither a Coordenada nor photo GPS, so filling in a real Coordenada replaces
 Errors (a malformed Identificador, Versión or Coordenada, two photos for the same version) stop the build.
 Warnings (no Coordenada yet, a photo without a row, a place outside the map frame) don't.
 Web copies of the photos are scaled to 2000 px and stripped of metadata, including GPS.
+
+## Proposals from visitors
+
+The map's **Proponer un caso** button lets anyone mark a place, describe it and attach up to four photos. The photos
+are shrunk in the browser and sent to `api/proponer.js`, which queues them in Vercel Blob under `propuestas/<id>/`
+(random, unguessable file names; no contact details are collected). Nothing reaches the map until the team adds it:
+
+```sh
+npm install                                             # once
+npx vercel env pull .env.local                          # once: gets BLOB_READ_WRITE_TOKEN
+node --env-file=.env.local scripts/propuestas.mjs                    # list pending proposals
+node --env-file=.env.local scripts/propuestas.mjs importar <id>      # download one to db/propuestas/<id>/
+.venv/bin/python scripts/importar_propuesta.py db/propuestas/<id>    # next Identificador, rows, photos (--dry-run to preview)
+.venv/bin/python scripts/build_archive.py                            # check it, then commit and push
+node --env-file=.env.local scripts/propuestas.mjs borrar <id>        # remove it from the queue (also to reject)
+```
+
+One-time setup on Vercel: Storage → Create → Blob, and connect it to the project (that sets `BLOB_READ_WRITE_TOKEN`).
+Locally the form cannot send (the Python server has no functions); `npx vercel dev` runs it with the function.
 
 ## Running the site
 

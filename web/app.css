@@ -16,7 +16,7 @@ html,body{height:100%}
 body{margin:0;background:var(--bg);color:var(--ink);font:14px/1.45 var(--font);overflow:hidden}
 #root,.app{height:100%}.app{position:relative}
 .map{position:relative;height:100%;overflow:hidden;cursor:grab;touch-action:none;user-select:none}
-.map.drag{cursor:grabbing}.map.over{cursor:pointer}
+.map.drag{cursor:grabbing}.map.over{cursor:pointer}.map.picking{cursor:crosshair}
 .map>canvas{position:absolute;inset:0;width:100%;height:100%;transform-origin:0 0}.map>canvas.under,.map>canvas.over{transform:none!important;pointer-events:none}
 /* outside the frame: paper. Two generated layers with different periods so they never line up: paper.jpg (2048 px shown at 1024:
    a fine stipple over small marbled shapes, cold-press relief, tooth and specks) and paper-mottle.jpg (soft large mottling),
@@ -178,3 +178,25 @@ button:hover{border-color:var(--frame)}button:focus-visible,input:focus-visible{
  .viewer{padding:12px;place-items:center}.viewer .pic img,.viewer .cap{max-width:calc(100vw - 48px)}.viewer .pic img{max-height:calc(58vh - 120px)}
 }
 @media(prefers-reduced-motion:reduce){*,*::before,*::after{animation-duration:.01ms!important;animation-delay:0s!important;transition:none!important}}
+
+/* proposing a case: the button, the point on the map, the form */
+.propbtn{position:absolute;right:14px;top:10px;z-index:8;font-size:12px;min-height:30px}
+.leads .mark .pm{fill:var(--ink);stroke:#fff;stroke-width:2}
+.propose{position:absolute;right:0;top:0;bottom:0;z-index:15;width:min(340px,100%);overflow:auto;background:var(--card);border-left:1px solid var(--line);
+  padding:14px 16px 18px;display:flex;flex-direction:column;gap:10px;font-size:12px;box-shadow:-10px 0 30px rgb(0 0 0/.06);animation:rise .3s ease both}
+.propose header{display:flex;justify-content:space-between;align-items:center}.propose h2{margin:0;font-size:15px}
+.propose .close{border:0;font-size:18px;min-width:30px;padding:0}
+.propose .step{margin:0;color:var(--mute)}
+.propose label{display:flex;flex-direction:column;gap:3px;color:var(--mute)}.propose label small{font-size:10px}
+.propose input,.propose textarea{font:12px var(--font);color:var(--ink);background:var(--bg);border:1px solid var(--line);padding:6px 7px}
+.propose textarea{resize:vertical}
+.propose fieldset{border:1px solid var(--line);padding:6px 8px 8px;margin:0;display:flex;flex-wrap:wrap;gap:4px 14px}.propose legend{color:var(--mute);padding:0 4px}
+.propose label.inline{flex-direction:row;align-items:center;gap:6px;color:var(--ink)}.propose label.inline input[type=range]{width:120px;padding:0}
+.propose .fotos{display:flex;flex-wrap:wrap;gap:6px}.propose .fotos span{position:relative}
+.propose .fotos img{width:68px;height:68px;object-fit:cover;display:block}
+.propose .fotos span button{position:absolute;right:2px;top:2px;min-width:20px;min-height:20px;padding:0;font-size:12px;line-height:1}
+.propose .addf{width:68px;height:68px;border:1px dashed var(--frame);display:grid;place-items:center;cursor:pointer;color:var(--ink)}
+.propose .addf input{display:none}
+.propose .hp{position:absolute;left:-9999px;width:1px;height:1px}
+.propose .err{margin:0;color:#b3261e}.propose .send{background:var(--ink);color:var(--bg);border-color:var(--ink)}
+.propose .note{margin:0;color:var(--mute);font-size:10px}

@@ -24,8 +24,10 @@ async function loadData(){
   const r=new Float32Array(x.length);for(let i=0;i<r.length;i++)r[i]=1.2+h[i]/4*.28; // crown radius (m) from height
   const paths={};
   for(const k of ['water','green']){const p=new Path2D();for(const d of o.layers[k]||[]){let px=0,py=0;for(let i=0;i<d.length;i+=2){px+=d[i];py+=d[i+1];i?p.lineTo(px,py):p.moveTo(px,py)}p.closePath()}paths[k]=p}
-  const bld=bu.rings.map(c=>{const L=b64(c.len,Uint16Array),d=b64(c.d,Int16Array),p=new Path2D();let j=0;
-    for(let k=0;k<L.length;k++){let px=0,py=0;for(let i=0;i<L[k];i++,j+=2){px+=d[j];py+=d[j+1];i?p.lineTo(px,py):p.moveTo(px,py)}p.closePath()}return p});
+  // buildings: one Path2D per 2000 rings. A single path for a class (~1M points) takes tens of seconds to build in Chromium,
+  // since appending slows down as a path grows; chunks keep the whole load under a second.
+  const bld=bu.rings.map(c=>{const L=b64(c.len,Uint16Array),d=b64(c.d,Int16Array),ps=[];let j=0,p=null;
+    for(let k=0;k<L.length;k++){if(k%2000===0)ps.push(p=new Path2D());let px=0,py=0;for(let i=0;i<L[k];i++,j+=2){px+=d[j];py+=d[j+1];i?p.lineTo(px,py):p.moveTo(px,py)}p.closePath()}return ps});
   return {W:t.frame[0],H:t.frame[1],origin:t.origin,n:x.length,x,y,r,paths,bld,places:pl.places};
 }
 /* a square's name: the nearest place of a level that suits its size (districts for 2 km and up, barrios down to 500 m,
@@ -173,7 +175,7 @@ function packOne(L,ctx){const {U,ox,oy,v,bw,bh,avoid,blocked,reach,occ,dirs}=ctx
 const leaderTo=(r,px,py)=>[Math.min(r.left+r.W,Math.max(r.left,px)),Math.min(r.top+r.H,Math.max(r.top,py)),px,py];
 
 /* ---------- map ---------- */
-function MapView({D,layers,cases,onOpen,paused,children}){
+function MapView({D,layers,cases,onOpen,paused,pick,onPick,mark,children}){
   const box=useRef(),cv=useRef(),under=useRef(),over=useRef(),view=useRef(null),[tick,setTick]=useState(0),[hover,setHover]=useState(null),[wipe,setWipe]=useState(.5),[intro,setIntro]=useState(false),drag=useRef(null);
   const [pin,setPin]=useState(null),[page,setPage]=useState(0),entering=useRef(false),lastW=useRef(.5),anim=useRef();
   const [lit,setLit]=useState(null),avoid=useRef({s:'',a:[]});
@@ -197,7 +199,7 @@ function MapView({D,layers,cases,onOpen,paused,children}){
     g.setTransform(dpr,0,0,dpr,0,0);g.save();g.beginPath();g.rect(sx(-W),sy(H),2*W*s,2*H*s);g.clip();g.fillStyle=col('--bg');g.fill();
     g.setTransform(dpr*s,0,0,-dpr*s,dpr*tx,dpr*ty);
     if(layers.green){g.fillStyle=col('--green');g.fill(D.paths.green)}
-    if(layers.buildings){D.bld.forEach((p,i)=>{g.fillStyle=col('--b'+i);g.fill(p,'evenodd')})}
+    if(layers.buildings){D.bld.forEach((ps,i)=>{g.fillStyle=col('--b'+i);for(const p of ps)g.fill(p,'evenodd')})}
     // water courses lead: drawn above buildings, with a 2 px outline so the river stays a continuous ribbon
     if(layers.water){g.fillStyle=g.strokeStyle=col('--water');g.fill(D.paths.water);g.lineJoin='round';g.lineWidth=2/s;g.stroke(D.paths.water)}
     g.setTransform(dpr,0,0,dpr,0,0);
@@ -242,7 +244,7 @@ function MapView({D,layers,cases,onOpen,paused,children}){
     const f=t=>{const k=Math.min(1,(t-t0)/T),e=1-Math.pow(1-k,3);v.tx=a.tx+(to.tx-a.tx)*e;v.ty=a.ty+(to.ty-a.ty)*e;kick();if(k<1)anim.current=requestAnimationFrame(f)};anim.current=requestAnimationFrame(f)};
 
   /* ---- hover and pin ---- */
-  const F=pin||(hover&&tiles[hover])||null,focus=!!F;
+  const F=pin||(!pick&&hover&&tiles[hover])||null,focus=!!F;
   const enter=g=>{setHover(g?g.key:null);if(!g)return;setIntro(true);setWipe(1);entering.current=true; // the old photo sweeps open from the right to the pointer
     requestAnimationFrame(()=>requestAnimationFrame(()=>{entering.current=false;setWipe(lastW.current)}));clearTimeout(enter.t);enter.t=setTimeout(()=>setIntro(false),600)};
   const doPin=g=>{const P={key:'pin',x0:g.x0,y0:g.y0,size:g.size,ids:g.ids};setPin(P);setPage(0);setHover(null);setLit(null);setIntro(false);
@@ -285,6 +287,7 @@ function MapView({D,layers,cases,onOpen,paused,children}){
     const g=hit(e);if(g)lastW.current=(m[0]-g.x0)/g.size;
     if((g&&g.key)!==hover)enter(g);else if(g&&!entering.current)setWipe(lastW.current)};
   const up=e=>{const d=drag.current;drag.current=null;if(!d)return;if(d.moved>=4){setTick(t=>t+1);return}const m=toM(e);
+    if(pick){if(Math.abs(m[0])<=D.W&&Math.abs(m[1])<=D.H)onPick(m);return}  // proposing a case: the click places it
     if(d.card){openItem(d.card.id,d.card.item,d.card.el);return}
     if(pin&&inside(pin,m)){openTile(pin);return}
     const g=hit(e);if(g)doPin(g);else if(pin)setPin(null)};
@@ -310,7 +313,7 @@ function MapView({D,layers,cases,onOpen,paused,children}){
         onFocus=${()=>setLit(r.key)} onBlur=${()=>setLit(null)} onKeyDown=${e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();e.stopPropagation();openItem(c.id,item,e.currentTarget)}}}>
       <div class="sheet">${media(c,it,lit===r.key)}</div><span class="lab"><i>${catNo(c)}</i>${c.title}</span></div>`};
   const FR=F&&rect(F);
-  return html`<div ref=${box} class=${'map'+(drag.current?' drag':'')+(hover||pin?' over':'')+(focus?' focus':'')} onPointerDown=${down} onPointerMove=${move} onPointerUp=${up}
+  return html`<div ref=${box} class=${'map'+(drag.current?' drag':'')+(pick?' picking':hover||pin?' over':'')+(focus?' focus':'')} onPointerDown=${down} onPointerMove=${move} onPointerUp=${up}
       onPointerLeave=${()=>setHover(null)}>
     <canvas ref=${under} class="under"></canvas><canvas ref=${cv}></canvas><canvas ref=${over} class="over"></canvas>
     <div class="title">Laboratorio Naturaleza Urbana</div>
@@ -319,7 +322,8 @@ function MapView({D,layers,cases,onOpen,paused,children}){
     ${v&&html`<svg class="leads" aria-hidden="true">
       ${plot.map((r,k)=>{const c=cases[r.id],[x1,y1,x2,y2]=leaderTo(r,v.tx+c.x*v.s,v.ty-c.y*v.s);return html`<g key=${'p'+r.key} class=${lit==='p'+r.key?'lit':''} style=${{'--d':.25+k*.07+'s'}}><line pathLength="1" x1=${x1} y1=${y1} x2=${x2} y2=${y2}/></g>`})}
       ${pin&&pin.ids.map(id=>{const c=cases[id];if(!c)return null;const on=lit&&lit.slice(1).startsWith('f'+id+'.'),X=v.tx+c.x*v.s,Y=v.ty-c.y*v.s;
-        return html`<g key=${'d'+id}>${c.r>0&&html`<circle class="unc" cx=${X} cy=${Y} r=${c.r*v.s}/>`}<circle class=${'dot'+(on?' lit':'')} cx=${X} cy=${Y} r="3.5"/></g>`})}</svg>`}
+        return html`<g key=${'d'+id}>${c.r>0&&html`<circle class="unc" cx=${X} cy=${Y} r=${c.r*v.s}/>`}<circle class=${'dot'+(on?' lit':'')} cx=${X} cy=${Y} r="3.5"/></g>`})}
+      ${mark&&(()=>{const X=v.tx+mark.x*v.s,Y=v.ty-mark.y*v.s;return html`<g class="mark">${mark.r>0&&html`<circle class="unc" cx=${X} cy=${Y} r=${mark.r*v.s}/>`}<circle class="pm" cx=${X} cy=${Y} r="6"/></g>`})()}</svg>`}
     ${plot.map((r,k)=>cardEl({...r,key:'p'+r.key},'',.25+k*.07,itemName(cases[r.id].items[r.item]),r.item))}
     ${pin&&pages>1&&html`<div class="pager" style=${{left:FR.left+FR.width/2,top:FR.top+FR.height+12}} onPointerDown=${e=>e.stopPropagation()} onPointerUp=${e=>e.stopPropagation()}>
       <button aria-label="Anteriores" onClick=${()=>setPage(p=>p-1)}>‹</button><span>${pg+1} / ${pages}</span><button aria-label="Siguientes" onClick=${()=>setPage(p=>p+1)}>›</button></div>`}
@@ -427,9 +431,50 @@ function Explore({D,cases,open,eq,onClose}){
         ${info&&html`<p>Arrastra para mover, rueda para acercar, ↑ ↓ para pasar de archivo, Esc para volver. En la lente, la ortofoto de 1956 (Vuelo Americano Serie B, 1956–57); de fondo, la de hoy (PNOA). © IGN, CC BY 4.0.</p>`}</div>
     </aside></div>`}
 
+/* ---------- proposing a case ----------
+   The visitor clicks where the photo was taken, fills a short form and attaches up to four photos. Photos are shrunk here
+   (JPEG, 1600 px, under ~1 MB each) so the request stays within the function's 4.5 MB limit; api/proponer.js queues it
+   for the team's review (scripts/propuestas.mjs). */
+const MAX_FOTOS=4;
+const toJpeg=file=>new Promise((res,rej)=>{const u=URL.createObjectURL(file),im=new Image();im.onerror=()=>{URL.revokeObjectURL(u);rej(new Error(file.name))};
+  im.onload=()=>{const k=Math.min(1,1600/Math.max(im.width,im.height)),c=document.createElement('canvas');c.width=Math.round(im.width*k);c.height=Math.round(im.height*k);
+    c.getContext('2d').drawImage(im,0,0,c.width,c.height);URL.revokeObjectURL(u);let q=.84,d=c.toDataURL('image/jpeg',q);while(d.length>1.35e6&&q>.4){q-=.1;d=c.toDataURL('image/jpeg',q)}res(d)};im.src=u});
+function Propose({D,at,setR,onClose}){
+  const [f,setF]=useState({titulo:'',fecha:'',descripcion:'',fuente:'',nombre:'',web:''}),[aprox,setAprox]=useState(false),[radio,setRadio]=useState(200);
+  const [fotos,setFotos]=useState([]),[state,setState]=useState(null);
+  useEffect(()=>setR(aprox?radio:0),[aprox,radio]);
+  const set=k=>e=>setF(o=>({...o,[k]:e.target.value}));
+  const add=async e=>{const fs=[...e.target.files].filter(x=>x.type.startsWith('image/')).slice(0,MAX_FOTOS-fotos.length);e.target.value='';
+    try{const d=await Promise.all(fs.map(toJpeg));setFotos(o=>[...o,...d].slice(0,MAX_FOTOS))}catch(err){setState({error:'No se pudo leer '+err.message})}};
+  const send=async e=>{e.preventDefault();if(!at)return setState({error:'Haz clic en el mapa donde se tomó la foto.'});if(!fotos.length)return setState({error:'Añade al menos una foto.'});
+    setState({sending:true});const [lon,lat]=toLL(D,at.x,at.y);
+    try{const r=await fetch('api/proponer',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({...f,lat,lon,radio:aprox?radio:0,fotos})});
+      const j=await r.json().catch(()=>({}));if(!r.ok)throw new Error(j.error||'Error '+r.status);setState({done:true})}
+    catch(err){setState({error:err.message||'No se pudo enviar.'})}};
+  if(state&&state.done)return html`<aside class="propose"><h2>Gracias</h2><p>Hemos recibido la propuesta. El equipo la revisará antes de añadirla al mapa.</p><button onClick=${onClose}>Cerrar</button></aside>`;
+  return html`<form class="propose" onSubmit=${send} onPointerDown=${e=>e.stopPropagation()}>
+    <header><h2>Proponer un caso</h2><button type="button" class="close" aria-label="Cerrar" onClick=${onClose}>×</button></header>
+    <p class="step">${at?'Ubicación marcada. Haz clic en otro punto para moverla.':'Haz clic en el mapa donde se tomó la foto.'}</p>
+    <label>Título<input required maxlength="140" value=${f.titulo} onInput=${set('titulo')} placeholder="Lugar o calle"/></label>
+    <label>Año o fecha<input maxlength="40" value=${f.fecha} onInput=${set('fecha')} placeholder="1960, años 70…"/></label>
+    <label>Descripción<textarea required maxlength="2000" rows="3" value=${f.descripcion} onInput=${set('descripcion')}></textarea></label>
+    <label>Fuente<input maxlength="200" value=${f.fuente} onInput=${set('fuente')} placeholder="Archivo, libro, álbum familiar…"/></label>
+    <label>Tu nombre <small>(opcional, para el crédito)</small><input maxlength="80" value=${f.nombre} onInput=${set('nombre')}/></label>
+    <fieldset><legend>Ubicación</legend>
+      <label class="inline"><input type="radio" checked=${!aprox} onChange=${()=>setAprox(false)}/>Exacta</label>
+      <label class="inline"><input type="radio" checked=${aprox} onChange=${()=>setAprox(true)}/>Aproximada</label>
+      ${aprox&&html`<label class="inline">±${radio} m<input type="range" min="50" max="2000" step="50" value=${radio} onInput=${e=>setRadio(+e.target.value)}/></label>`}</fieldset>
+    <div class="fotos">${fotos.map((d,i)=>html`<span key=${i}><img src=${d} alt=""/><button type="button" aria-label="Quitar foto" onClick=${()=>setFotos(o=>o.filter((_,j)=>j!==i))}>×</button></span>`)}
+      ${fotos.length<MAX_FOTOS&&html`<label class="addf">+ Foto<input type="file" accept="image/*" multiple onChange=${add}/></label>`}</div>
+    <input class="hp" tabIndex="-1" autoComplete="off" aria-hidden="true" value=${f.web} onInput=${set('web')} name="web"/>
+    ${state&&state.error&&html`<p class="err">${state.error}</p>`}
+    <button type="submit" class="send" disabled=${state&&state.sending}>${state&&state.sending?'Enviando…':'Enviar'}</button>
+    <p class="note">Las propuestas se revisan antes de publicarse. No compartas fotos sin permiso.</p></form>`}
+
 function App(){
   const [D,setD]=useState(null),[err,setErr]=useState(null),[layers,setLayers]=useState(()=>({buildings:true,trees:true,water:true,green:true,bw:localStorage.getItem('lnu-bw')==='1'}));
   const [cases,setCases]=useState({}),[open,setOpen]=useState(null),[info,setInfo]=useState(false),[,setAsp]=useState(0);
+  const [proposing,setProposing]=useState(false),[at,setAt]=useState(null),[atR,setAtR]=useState(0);
   useEffect(()=>preloadAspects(cases,()=>setAsp(x=>x+1)),[cases]); // photo shapes decide card shapes
   useEffect(()=>{Promise.all([loadData(),fetch('data/cases.json').then(r=>r.ok?r.json():{cases:[]}).catch(()=>({cases:[]}))]).then(([d,cj])=>{
     const all={};for(const c of cj.cases){const [x,y]=toLocal(d,c.lon,c.lat);all[c.id]={...c,x,y,r:c.r||0}}
@@ -447,7 +492,10 @@ function App(){
       Árboles (${D.n.toLocaleString('es-ES')}): Ayuntamiento de Madrid, 2026. Edificios: Catastro. Agua, parques y nombres: © OpenStreetMap.
       Ortofotos: © IGN, Vuelo Americano 1956–57 y PNOA, CC BY 4.0.</p>`}</div>`;
   return html`<div class=${"app"+(layers.bw?" bw":"")}>
-    <${MapView} D=${D} layers=${layers} cases=${cases} onOpen=${setOpen} paused=${!!open}>${legend}<//>
+    <${MapView} D=${D} layers=${layers} cases=${cases} onOpen=${setOpen} paused=${!!open||proposing} pick=${proposing}
+      onPick=${([x,y])=>setAt({x,y})} mark=${proposing&&at&&{...at,r:atR}}>${legend}<//>
+    ${!proposing&&html`<button class="propbtn" onClick=${()=>{setAt(null);setProposing(true)}}>Proponer un caso</button>`}
+    ${proposing&&html`<${Propose} D=${D} at=${at} setR=${setAtR} onClose=${()=>{setProposing(false);setAt(null)}}/>`}
     ${open&&html`<${Explore} key=${open.tile.x0+','+open.tile.y0} D=${D} cases=${cases} open=${open} eq=${layers.bw} onClose=${()=>setOpen(null)}/>`}
   </div>`;
 }

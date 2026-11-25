@@ -15,3 +15,11 @@ palettes/dist/
 
 # Excel lock files
 ~$*.xlsx
+
+# node (the proposal function and its review script)
+node_modules/
+.env*
+.vercel/
+
+# proposals downloaded for review (scripts/propuestas.mjs importar)
+db/propuestas/
