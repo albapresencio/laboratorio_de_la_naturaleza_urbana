@@ -1,5 +1,6 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
-  "buildCommand": "pip3 install -r requirements.txt && python3 scripts/build_archive.py",
+  "framework": null,
+  "buildCommand": "echo 'web/ is served as is: run scripts/build_archive.py and commit web/data/cases.json and web/media/ after editing db/'",
   "outputDirectory": "web"
 }

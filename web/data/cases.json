@@ -1,0 +1,417 @@
+{
+ "note": "Archive cases, built from db/archivo_fotografias.xlsx by scripts/build_archive.py: do not edit by hand. Each case is geolocated: exact (lon/lat) or approximate (lon/lat + r in metres). loc says where the coordinate comes from: sheet (Coordenada), gps (photo metadata) or estimate (from Localización). Items: versions {photos:[{src,label,year,credit,v}...]} (one photo in several versions), photo {src,label,year,credit}, text {body,label}, audio {src,label}, file {src,label}.",
+ "cases": [
+  {
+   "id": "c1",
+   "n": 1,
+   "title": "Arroyo Abroñigal de madrid a puente de vallecas",
+   "items": [
+    {
+     "type": "photo",
+     "src": "media/fotos/1-a.jpg",
+     "label": "Foto de 1900 del antiguo arroyo Abroñigal, que discurría donde actualmente está la autopista M-30 en la zona este de Madrid (de Madrid a Puente de Vallecas). El Arroyo Abroñigal (denominado también Arroyo de Valnegral) era un afluente del río Manzanares. El emplazamiento exacto de la foto es desconocido.",
+     "year": "1900",
+     "credit": "Augusto T. Arcimís - Archivo Arcivís",
+     "link": "https://drive.google.com/file/d/1at95BYpd0EINUy0hUbgSugz9Hao_RIRp/view?usp=drive_link"
+    }
+   ],
+   "date": "1900",
+   "lat": 40.411,
+   "lon": -3.665,
+   "loc": "estimate",
+   "r": 2000
+  },
+  {
+   "id": "c2",
+   "n": 2,
+   "title": "Parque Marques de Suanzes vista aerea 1960",
+   "items": [
+    {
+     "type": "photo",
+     "src": "media/fotos/2-a.jpg",
+     "label": "Parque Marques de Suanzes vista aerea 1960",
+     "year": "1960",
+     "credit": "Hemeroteca de Suanzes - https://suanzes.org/galeria-fotos-suanzes",
+     "link": "https://drive.google.com/file/d/1FhK0F1GJ9u2uQidOxGqMJxcevT7MkuPk/view?usp=drive_link"
+    }
+   ],
+   "date": "1960",
+   "lat": 40.441,
+   "lon": -3.624,
+   "loc": "estimate",
+   "r": 300
+  },
+  {
+   "id": "c3",
+   "n": 3,
+   "title": "C/ Jose Arcones Gil",
+   "items": [
+    {
+     "type": "versions",
+     "photos": [
+      {
+       "src": "media/fotos/3-a.jpg",
+       "label": "C/ Jose Arcones Gil",
+       "link": "https://drive.google.com/file/d/1P_r76MUjgPacGt76lnAFZ9LiigoYDWib/view?usp=drive_link",
+       "v": "a"
+      },
+      {
+       "src": "media/fotos/3-b.jpg",
+       "label": "C/ Jose Arcones Gil , Policía",
+       "year": "2026",
+       "credit": "Elaboración propia",
+       "link": "https://drive.google.com/file/d/1nmWLyxcx1PDw8CiZVjC3j_AFZwt0UiKM/view?usp=drive_link",
+       "v": "b"
+      }
+     ]
+    }
+   ],
+   "date": "2026",
+   "lat": 40.43436,
+   "lon": -3.63828,
+   "loc": "gps"
+  },
+  {
+   "id": "c4",
+   "n": 4,
+   "title": "C/ Jose Arcones Gil",
+   "items": [
+    {
+     "type": "versions",
+     "photos": [
+      {
+       "src": "media/fotos/4-a.jpg",
+       "label": "C/ Jose Arcones Gil, Colegio",
+       "link": "https://drive.google.com/file/d/1PaTrbKc7h2eFDYbRVK9rMcP6N7lmxqnq/view?usp=drive_link",
+       "v": "a"
+      },
+      {
+       "src": "media/fotos/4-b.jpg",
+       "label": "C/ Jose Arcones Gil",
+       "year": "2026",
+       "credit": "Elaboración propia",
+       "link": "https://drive.google.com/file/d/1dl7HbRdehKvqBBzTFS0kkd-rXV2pk8dd/view?usp=drive_link",
+       "v": "b"
+      }
+     ]
+    }
+   ],
+   "date": "2026",
+   "lat": 40.43505,
+   "lon": -3.63843,
+   "loc": "gps"
+  },
+  {
+   "id": "c5",
+   "n": 5,
+   "title": "Parque Arriaga C/ Gonzalo de Berceo",
+   "items": [
+    {
+     "type": "versions",
+     "photos": [
+      {
+       "src": "media/fotos/5-a.jpg",
+       "label": "Parque Arriaga C/ Gonzalo de Berceo",
+       "credit": "Luis Puicercús Vázquez | Album de fotos: Ventas - Ciudad Lineal 1900-1960",
+       "link": "https://drive.google.com/file/d/1JtOzx8Mtylv8JdrkHFXByCZ4qdzyBytI/view?usp=drive_link",
+       "v": "a"
+      },
+      {
+       "src": "media/fotos/5-b.jpg",
+       "label": "Parque Arriaga C/ Gonzalo de Berceo",
+       "year": "2026",
+       "credit": "Elaboración propia",
+       "link": "https://drive.google.com/file/d/1zj6RZFh1ypNwZV59RRX2YhgeD_mruWgK/view?usp=drive_link",
+       "v": "b"
+      }
+     ]
+    }
+   ],
+   "date": "2026",
+   "lat": 40.42641,
+   "lon": -3.64486,
+   "loc": "gps"
+  },
+  {
+   "id": "c6",
+   "n": 6,
+   "title": "Calle Esteban Collantes 37-39",
+   "items": [
+    {
+     "type": "versions",
+     "photos": [
+      {
+       "src": "media/fotos/6-a.jpg",
+       "label": "Calle Esteban Collantes 37-39",
+       "credit": "Luis Puicercús Vázquez - Album de fotos: Ventas - Ciudad Lineal 1900-1960",
+       "v": "a"
+      },
+      {
+       "src": "media/fotos/6-b.jpg",
+       "label": "Calle Esteban Collantes 37-38",
+       "credit": "Luis Puicercús Vázquez - Album de fotos: Ventas - Ciudad Lineal 1900-1961",
+       "v": "b"
+      },
+      {
+       "src": "media/fotos/6-c.jpg",
+       "label": "Calle Esteban Collantes 37-39",
+       "year": "2026",
+       "credit": "Elaboración propia",
+       "v": "c"
+      }
+     ]
+    }
+   ],
+   "date": "2026",
+   "lat": 40.43183,
+   "lon": -3.63999,
+   "loc": "gps"
+  },
+  {
+   "id": "c11",
+   "n": 11,
+   "title": "C/ Gregorio Donas con Llanos de Escurdo",
+   "items": [
+    {
+     "type": "versions",
+     "photos": [
+      {
+       "src": "media/fotos/11-a.jpg",
+       "label": "c/ Gregorio Donas con Llanos de Escurdo",
+       "credit": "Luis Puicercús Vázquez - Album de fotos: Ventas - Ciudad Lineal 1900-1961",
+       "v": "a"
+      },
+      {
+       "src": "media/fotos/11-b.jpg",
+       "label": "c/ Gregorio Donas con Llanos de Escurdo",
+       "year": "2026",
+       "credit": "Elaboración propia",
+       "v": "b"
+      }
+     ]
+    }
+   ],
+   "date": "2026",
+   "lat": 40.42731,
+   "lon": -3.63695,
+   "loc": "gps"
+  },
+  {
+   "id": "c12",
+   "n": 12,
+   "title": "Pinar de la Elipa",
+   "items": [
+    {
+     "type": "versions",
+     "photos": [
+      {
+       "src": "media/fotos/12-a.jpg",
+       "label": "Pinar La Elipa antes y despues filomena",
+       "credit": "Madriddiario.es",
+       "v": "a"
+      },
+      {
+       "src": "media/fotos/12-b.jpg",
+       "label": "Pinar La Elipa antes y despues filomena",
+       "credit": "Madriddiario.es",
+       "v": "b"
+      }
+     ]
+    }
+   ],
+   "lat": 40.4213,
+   "lon": -3.6462,
+   "loc": "estimate",
+   "r": 250
+  },
+  {
+   "id": "c13",
+   "n": 13,
+   "title": "Carretera de aragón con puente de trancos",
+   "items": [
+    {
+     "type": "photo",
+     "src": "media/fotos/13-a.jpg",
+     "label": "Carretera de Aragón, con el arroyo de la Quinta parando por debajo del puente de Trancos",
+     "credit": "Leo del Val | Canillejas Imágenes de un pueblo"
+    }
+   ],
+   "lat": 40.441,
+   "lon": -3.627,
+   "loc": "estimate",
+   "r": 600
+  },
+  {
+   "id": "c18",
+   "n": 18,
+   "title": "Plaza de Castelar",
+   "items": [
+    {
+     "type": "photo",
+     "src": "media/fotos/18-a.jpg",
+     "label": "Desfile de la victoria en la Plaza de Castelar",
+     "year": "1957-64",
+     "credit": "Aquel Madrid que se nos fue"
+    }
+   ],
+   "date": "1957-64",
+   "lat": 40.4194,
+   "lon": -3.693,
+   "loc": "estimate",
+   "r": 80
+  },
+  {
+   "id": "c19",
+   "n": 19,
+   "title": "Carretera de Extremadura, colegio de san buena bentura",
+   "items": [
+    {
+     "type": "photo",
+     "src": "media/fotos/19-a.jpg",
+     "label": "La Carretera de Extremedura",
+     "year": "1957-65",
+     "credit": "Aquel Madrid que se nos fue"
+    }
+   ],
+   "date": "1957-65",
+   "lat": 40.4085,
+   "lon": -3.7375,
+   "loc": "estimate",
+   "r": 400
+  },
+  {
+   "id": "c20",
+   "n": 20,
+   "title": "Puente de Ventas",
+   "items": [
+    {
+     "type": "photo",
+     "src": "media/fotos/20-a.jpg",
+     "label": "El arroyo Abronigal (luego M-30) en el puente de Ventas",
+     "year": "1957-66",
+     "credit": "Aquel Madrid que se nos fue"
+    }
+   ],
+   "date": "1957-66",
+   "lat": 40.4302,
+   "lon": -3.6622,
+   "loc": "estimate",
+   "r": 120
+  },
+  {
+   "id": "c21",
+   "n": 21,
+   "title": "Parque Sindical",
+   "items": [
+    {
+     "type": "photo",
+     "src": "media/fotos/21-a.jpg",
+     "label": "El Parque Sindical un Día Festivo",
+     "year": "1957-67",
+     "credit": "Aquel Madrid que se nos fue"
+    }
+   ],
+   "date": "1957-67",
+   "lat": 40.46,
+   "lon": -3.747,
+   "loc": "estimate",
+   "r": 500
+  },
+  {
+   "id": "c22",
+   "n": 22,
+   "title": "Manzanares, Puerta del angel",
+   "items": [
+    {
+     "type": "photo",
+     "src": "media/fotos/22-a.jpg",
+     "label": "Baño de multitud en el río Manzanares"
+    }
+   ],
+   "lat": 40.413,
+   "lon": -3.724,
+   "loc": "estimate",
+   "r": 400
+  },
+  {
+   "id": "c23",
+   "n": 23,
+   "title": "Puente de Segovia",
+   "items": [
+    {
+     "type": "photo",
+     "src": "media/fotos/23-a.jpg",
+     "label": "Canalización del Manzanares a su Paso por el Puente de Segovia"
+    }
+   ],
+   "lat": 40.4145,
+   "lon": -3.7175,
+   "loc": "estimate",
+   "r": 120
+  },
+  {
+   "id": "c24",
+   "n": 24,
+   "title": "Plaza EspañA",
+   "items": [
+    {
+     "type": "photo",
+     "src": "media/fotos/24-a.jpg",
+     "label": "Jugando a Indios y cowboys en la plaza de españa"
+    }
+   ],
+   "lat": 40.4234,
+   "lon": -3.7122,
+   "loc": "estimate",
+   "r": 150
+  },
+  {
+   "id": "c25",
+   "n": 25,
+   "title": "Plaza españa",
+   "items": [
+    {
+     "type": "photo",
+     "src": "media/fotos/25-a.jpg",
+     "label": "Construcción de la torre de madrid y juego de frontón en las tapias del cuartel de la montaña"
+    }
+   ],
+   "lat": 40.424,
+   "lon": -3.714,
+   "loc": "estimate",
+   "r": 200
+  },
+  {
+   "id": "c26",
+   "n": 26,
+   "title": "El estanque del retiroaguardando los decorados de \"el fabuloso mundo del circo\"",
+   "items": [
+    {
+     "type": "photo",
+     "src": "media/fotos/26-a.jpg",
+     "label": "El estanque del retiroaguardando los decorados de \"el fabuloso mundo del circo\""
+    }
+   ],
+   "lat": 40.4181,
+   "lon": -3.6835,
+   "loc": "estimate",
+   "r": 150
+  },
+  {
+   "id": "c27",
+   "n": 27,
+   "title": "La puerta del sol un domingo veraniego",
+   "items": [
+    {
+     "type": "photo",
+     "src": "media/fotos/27-a.jpg",
+     "label": "La puerta del sol un domingo veraniego"
+    }
+   ],
+   "lat": 40.4169,
+   "lon": -3.7035,
+   "loc": "estimate",
+   "r": 80
+  }
+ ]
+}

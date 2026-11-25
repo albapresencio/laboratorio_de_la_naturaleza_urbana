@@ -15,8 +15,8 @@ db/                          the archive database: edit this
   coordenadas_aproximadas.csv  estimated coordinates (with an uncertainty radius) for cases without a better one
   fuentes.xlsx               research links: archives and collections to look through
 web/                   the site (static, no build step): index.html, app.js, app.css
-  data/                map data: buildings.json, trees.json, osm.json (+ cases.json, generated)
-  media/               generated from db/fotografias
+  data/                map data: buildings.json, trees.json, osm.json, places.json, cases.json (generated from db/)
+  media/               web copies of the photos (generated from db/fotografias)
   tiles/1956/          1956 orthophoto tile pyramid
 scripts/               data pipeline (Python) and the proposal review tools
 api/proponer.js        Vercel Function behind the map's "Añadir al archivo" form
@@ -47,6 +47,8 @@ python3 -m venv .venv
 .venv/bin/python scripts/build_archive.py           # validate, then write web/data/cases.json and web/media/
 ```
 
+Commit `web/data/cases.json` and `web/media/` with the spreadsheet: the site is served as is (no build on Vercel).
+
 **Coordinates from photo metadata.** After adding phone photos, run `build_archive.py --extract-gps` once: it
 reads each photo's GPS into `db/coordenadas_metadatos.csv` and then removes it from the photo (losslessly), so
 nobody's location is published. A point shared by photos of *different* cases is discarded: that is where old
@@ -63,12 +65,13 @@ Web copies of the photos are scaled to 2000 px and stripped of metadata, includi
 ## Proposals from visitors
 
 The map's **Añadir al archivo** button lets anyone mark a place, describe it and attach up to four photos. The photos
-are shrunk in the browser and sent to `api/proponer.js`, which queues them in Vercel Blob under `propuestas/<id>/`
-(random, unguessable file names; no contact details are collected). Nothing reaches the map until the team adds it:
+are shrunk in the browser and sent to `api/proponer.js`, which queues them in a **private** Vercel Blob store under
+`propuestas/<id>/` (nothing reachable from the web; no contact details are collected). Nothing reaches the map until
+the team adds it:
 
 ```sh
 npm install                                             # once
-npx vercel env pull .env.local                          # once: gets BLOB_READ_WRITE_TOKEN
+npx vercel env pull .env.local                          # gets the store's credentials (again when they expire)
 node --env-file=.env.local scripts/propuestas.mjs                    # list pending proposals
 node --env-file=.env.local scripts/propuestas.mjs importar <id>      # download one to db/propuestas/<id>/
 .venv/bin/python scripts/importar_propuesta.py db/propuestas/<id>    # next Identificador, rows, photos (--dry-run to preview)
@@ -76,7 +79,7 @@ node --env-file=.env.local scripts/propuestas.mjs importar <id>      # download 
 node --env-file=.env.local scripts/propuestas.mjs borrar <id>        # remove it from the queue (also to reject)
 ```
 
-One-time setup on Vercel: Storage → Create → Blob, and connect it to the project (that sets `BLOB_READ_WRITE_TOKEN`).
+One-time setup: `npx vercel blob create-store lnu-propuestas --access private`, connected to the project.
 Locally the form cannot send (the Python server has no functions); `npx vercel dev` runs it with the function.
 
 ## Running the site

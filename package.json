@@ -4,6 +4,6 @@
   "type": "module",
   "description": "Map site (web/) plus one Vercel Function (api/proponer.js) that queues proposed cases in Vercel Blob.",
   "dependencies": {
-    "@vercel/blob": "^1.0.0"
+    "@vercel/blob": "^2.9.0"
   }
 }

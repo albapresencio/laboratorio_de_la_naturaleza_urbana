@@ -4,8 +4,8 @@
    Body (JSON, under Vercel's 4.5 MB limit: the page shrinks photos before sending):
      {titulo, fecha?, descripcion, fuente?, nombre?, lat, lon, radio (m, 0 = exact), fotos: [data:image/jpeg;base64,...] (1-4),
       web (honeypot: must stay empty)}
-   Needs BLOB_READ_WRITE_TOKEN, which Vercel sets when a Blob store is connected to the project.
-   Blobs are public but stored under random, unguessable names; no contact details are collected. */
+   Needs a private Blob store connected to the project (Vercel then provides the credentials). Proposals are private:
+   nothing is reachable from the web until the team publishes it. No contact details are collected. */
 import { put } from '@vercel/blob';
 import { randomUUID } from 'node:crypto';
 
@@ -43,11 +43,12 @@ export default async function handler(req, res) {
   try {
     caso.fotos = [];
     for (const [i, buf] of images.entries()) {
-      const blob = await put(`propuestas/${id}/${'abcd'[i]}.jpg`, buf, { access: 'public', addRandomSuffix: true, contentType: 'image/jpeg' });
-      caso.fotos.push(blob.url);
+      const name = `propuestas/${id}/${'abcd'[i]}.jpg`;
+      await put(name, buf, { access: 'private', contentType: 'image/jpeg' });
+      caso.fotos.push(name);
     }
     caso.id = id; caso.recibido = new Date().toISOString();
-    await put(`propuestas/${id}/caso.json`, JSON.stringify(caso, null, 1), { access: 'public', addRandomSuffix: true, contentType: 'application/json' });
+    await put(`propuestas/${id}/caso.json`, JSON.stringify(caso, null, 1), { access: 'private', contentType: 'application/json' });
   } catch (e) {
     console.error('proponer:', e);
     return res.status(500).json({ error: 'No se pudo guardar la propuesta. Inténtalo más tarde.' });

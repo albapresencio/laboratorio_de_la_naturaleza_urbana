@@ -129,12 +129,6 @@ body{margin:0;background:var(--bg);color:var(--ink);font:14px/1.45 var(--font);o
 .viewer .pic{position:relative;display:inline-block;max-width:100%;line-height:0;align-self:center}
 .viewer .pic img{max-width:calc((100vw - 340px)*.6 - 44px);max-height:calc(100vh - 230px);display:block;user-select:none;-webkit-user-drag:none}
 .viewer .tag{position:absolute;bottom:10px;padding:1px 7px;font-size:12px;line-height:1.5;background:rgb(255 255 255/.92);color:#1f1f1f;z-index:22}
-.viewer .vers{display:flex;gap:10px;align-items:flex-start;max-width:calc((100vw - 340px)*.6 - 44px)}
-.viewer .vers figure{margin:0;flex:1 1 0;min-width:0;display:flex;flex-direction:column;gap:6px}
-.viewer .vers .pic img{width:100%;height:auto;max-height:calc(100vh - 300px);object-fit:contain;max-width:100%}
-.viewer .vers figcaption{display:block;font-size:12px;line-height:1.4;color:var(--ink)}
-.viewer .vers figcaption b{font-weight:700;margin-right:4px}.viewer .vers figcaption i{color:var(--mute);font-style:normal}
-.viewer .vers figcaption a{color:var(--mute);text-decoration:none}
 .viewer .cap{max-width:calc((100vw - 340px)*.6 - 44px);font-size:13px;line-height:1.4}
 .viewer .cap p{margin:0 0 4px}.viewer .cap b{display:inline-block;min-width:1.3em;font-weight:600}.viewer .cap i{color:var(--mute);font-style:normal}
 .viewer .cap a{color:var(--mute);font-size:12px;white-space:nowrap}
@@ -210,3 +204,16 @@ button:hover{border-color:var(--frame)}button:focus-visible,input:focus-visible{
 .yr{position:absolute;left:4px;top:4px;z-index:2;padding:0 5px;font-size:10px;line-height:1.6;background:rgb(255 255 255/.92);color:#1f1f1f;letter-spacing:.03em}
 .viewer .pic .yr{font-size:12px;left:6px;top:6px}
 .stage .chip.note{color:#55554f;font-size:11px}
+
+/* a case's versions: one floating card each, two across, sized to the stage's free area */
+.viewer.multi{display:flex;flex-direction:column;align-items:flex-end;justify-content:center;gap:10px}
+.viewer .vhead{pointer-events:auto;display:flex;align-items:center;gap:10px;padding:4px 4px 4px 10px;background:var(--card);font-size:12px;color:var(--mute);
+  box-shadow:0 0 0 .5px rgb(0 0 0/.12),0 8px 24px rgb(0 0 0/.18)}
+.viewer .vhead .x{min-height:26px;min-width:26px;padding:0;font-size:16px;line-height:1}
+.viewer .vgrid{display:flex;flex-wrap:wrap;justify-content:flex-end;align-items:flex-start;gap:12px;max-width:100%}
+.viewer .ver{display:table;padding:8px;flex:none}
+.viewer .ver .pic img{max-width:calc(((100vw - 340px)*.62 - 48px - 12px*(var(--cols) - 1))/var(--cols) - 16px);
+  max-height:calc((100vh - 150px)/var(--rows) - 78px);width:auto;height:auto}
+.viewer .ver figcaption{display:table-caption;caption-side:bottom;padding:6px 8px 8px;background:var(--card);font-size:11px;line-height:1.4;color:var(--ink)}
+.viewer .ver figcaption b{font-weight:700;margin-right:4px}.viewer .ver figcaption i{color:var(--mute);font-style:normal}
+.viewer .ver figcaption a{color:var(--mute);text-decoration:none}

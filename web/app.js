@@ -407,16 +407,16 @@ function LensMap({D,cases,tile,sel,aside}){
     <div class="bar"><span class="chip note">Fondo: ortofoto actual · lente: 1956–57. No coinciden necesariamente con el año de las fotos.</span>
       <label class="chip">1956 <input type="range" min="40" max="1200" step="10" value=${rad} aria-label="Tamaño de la lente de 1956" onInput=${e=>setRad(+e.target.value)} onPointerDown=${e=>e.stopPropagation()}/></label></div></div>`}
 
-// one item on the stage, floating over the map: a photo, its versions (side by side), a text, a sound or a file
+// one item on the stage, floating over the map: a photo, its versions (one card each), a text, a sound or a file
 const photoCap=p=>html`<span>${p.v&&html`<b>${p.v}</b> `}${p.label}${p.credit&&html` <i>· ${p.credit}</i>`}${p.link&&html` <a href=${p.link} target="_blank" rel="noopener" title="Original">↗</a>`}</span>`;
-// a case's versions side by side, each with its letter and caption
-function Versions({c,P,eq}){
-  return html`<div class="vers">${P.map(p=>html`<figure key=${p.src}><div class="pic"><${Pic} src=${p.src} eq=${eq} alt=${c.title+', '+p.label}/>${yearTag(p)}</div>
-    <figcaption>${photoCap(p)}</figcaption></figure>`)}</div>`}
 function Viewer({c,it,eq,onClose}){
   const head=html`<figcaption>${catNo(c)} · ${c.title}<button class="x" aria-label="Cerrar" onClick=${onClose}>×</button></figcaption>`;
   let body;
-  if(it.type==='versions')body=html`${head}<${Versions} c=${c} P=${it.photos} eq=${eq}/>`;
+  if(it.type==='versions'){const n=it.photos.length;   // each version in its own card, sized to the free space: 2 across, as many rows as needed
+    return html`<div class="viewer multi" style=${{'--cols':Math.min(2,n),'--rows':Math.ceil(n/2)}}>
+      <div class="vhead">${catNo(c)} · ${c.title}<button class="x" aria-label="Cerrar" onClick=${onClose}>×</button></div>
+      <div class="vgrid">${it.photos.map(p=>html`<figure class="float ver" key=${p.src}><div class="pic"><${Pic} src=${p.src} eq=${eq} alt=${c.title+', '+p.label}/>${yearTag(p)}</div>
+        <figcaption>${photoCap(p)}</figcaption></figure>`)}</div></div>`}
   else if(it.type==='photo')body=html`${head}<div class="pic"><${Pic} src=${it.src} eq=${eq} alt=${c.title+(it.label?', '+it.label:'')}/>${yearTag(it)}</div><div class="cap"><p>${photoCap(it)}</p></div>`;
   else if(it.type==='text')body=html`${head}<blockquote class="text"><small>${it.label||'Texto'}</small>${it.body}</blockquote>`;
   else if(it.type==='audio')body=html`${head}<div class="aud"><${Sound} src=${it.src} label=${it.label} variant="big"/><p>${it.label}</p></div>`;
