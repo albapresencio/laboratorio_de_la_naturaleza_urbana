@@ -7,6 +7,7 @@
 const {useState,useEffect,useLayoutEffect,useRef,useCallback}=React;
 const html=htm.bind(React.createElement);
 const KM=1000, STEPS=[1000,500,250,100,50], PHOTO_PX=110;
+const FONT='"Courier Prime","Courier New",Courier,monospace'; // one typewriter face for everything, canvas included
 const REDUCED=matchMedia('(prefers-reduced-motion: reduce)').matches;
 // grid refines as you zoom: the coarsest step whose square is no bigger than ~2 photo footprints
 const stepFor=s=>STEPS.find(st=>st*s<=PHOTO_PX*1.25)||STEPS[STEPS.length-1];
@@ -191,6 +192,7 @@ function MapView({D,layers,cases,placing,onPlace,onOpen,paused,children}){
   useLayoutEffect(()=>{const d=drawn.current,v=view.current;if(!d||!v)return;const k=v.s/d.s;
     cv.current.style.transform=k===1&&v.tx===d.tx&&v.ty===d.ty?'':`translate(${v.tx-d.tx*k}px,${v.ty-d.ty*k}px) scale(${k})`});
   const fit=useCallback(()=>{const b=box.current.getBoundingClientRect(),m=46,s=Math.min((b.width-2*m)/(2*D.W),(b.height-2*m)/(2*D.H));view.current={s,tx:b.width/2,ty:b.height/2,min:s*.7,max:s*60};setTick(t=>t+1)},[D]);
+  useEffect(()=>{document.fonts&&document.fonts.ready.then(()=>setTick(t=>t+1))},[]);
   useEffect(()=>{fit();const ro=new ResizeObserver(()=>fit());ro.observe(box.current);const mo=new MutationObserver(()=>setTick(t=>t+1));mo.observe(document.documentElement,{attributes:true,attributeFilter:['data-theme']});
     const mq=matchMedia('(prefers-color-scheme: dark)'),f=()=>setTick(t=>t+1);mq.addEventListener('change',f);return()=>{ro.disconnect();mo.disconnect();mq.removeEventListener('change',f)}},[fit]);
 
@@ -227,12 +229,12 @@ function MapView({D,layers,cases,placing,onPlace,onOpen,paused,children}){
       for(let y=Math.ceil((ya+H)/stp)*stp-H;y<=yb;y+=stp){const Y=Math.round(sy(y))+.5;g.moveTo(sx(-W),Y);g.lineTo(sx(W),Y)}g.stroke()};
     const st=stepFor(s);if(st<KM)line(st,'--grid');line(KM,'--gridk');g.restore();
     g.strokeStyle=col('--frame');g.lineWidth=1;g.strokeRect(sx(-W)+.5,sy(H)+.5,2*W*s,2*H*s);
-    g.fillStyle=col('--mute');g.font='11px "Instrument Sans",system-ui,sans-serif';g.textBaseline='middle';
+    g.fillStyle=col('--mute');g.font='11px '+FONT;g.textBaseline='middle';
     const L=Math.max(4,sx(-W)-6);g.textAlign='right';
     for(let k=1;k<=2*H/KM;k++){const Y=sy(-H+k*KM);if(Y<8||Y>b.height-8)continue;g.fillText(k+' km',L-6,Y)}
     g.textAlign='center';const B=Math.min(b.height-12,sy(-H)+16);
     for(let c=0;c<2*W/KM;c++){const X=sx(-W+(c+.5)*KM);if(X>12&&X<b.width-12)g.fillText(String.fromCharCode(65+c),X,B)}
-    g.fillStyle=col('--ink');g.font='600 18px "Instrument Sans",system-ui,sans-serif';const T=sy(H)-18;if(T>14)g.fillText('N',sx(0),T)});
+    g.fillStyle=col('--ink');g.font='700 18px '+FONT;const T=sy(H)-18;if(T>14)g.fillText('N',sx(0),T)});
 
   const v=view.current,G=v&&gridFor(v.s),tiles=v?tilesFor(D,cases,G.B):{};
   const toM=e=>{const b=box.current.getBoundingClientRect(),v=view.current;return [(e.clientX-b.left-v.tx)/v.s,(v.ty-(e.clientY-b.top))/v.s]};
