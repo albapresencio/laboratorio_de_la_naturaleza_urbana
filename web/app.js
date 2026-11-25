@@ -11,7 +11,6 @@ const FONT='"Courier Prime","Courier New",Courier,monospace'; // one typewriter 
 const REDUCED=matchMedia('(prefers-reduced-motion: reduce)').matches;
 // grid refines as you zoom: the coarsest step whose square is no bigger than ~2 photo footprints
 const stepFor=s=>STEPS.find(st=>st*s<=PHOTO_PX*1.25)||STEPS[STEPS.length-1];
-const fmtStep=st=>st>=1000?st/1000+' km':st+' m';
 // the squares that hold cases: n x n grid steps, about one photo footprint on screen
 const gridFor=s=>{const st=stepFor(s),n=Math.max(1,Math.round(PHOTO_PX/(st*s)));return {st,B:n*st}};
 
@@ -40,7 +39,6 @@ function squareName(D,T){const k=T.x0+','+T.y0+','+T.size;if(nameCache.has(k))re
   if(!best)best=near(D.places.filter(p=>p[1]==='quarter'));
   const name=best?best[0]:'';nameCache.set(k,name);return name}
 const toLocal=(D,lon,lat)=>[(lon-D.origin[0])*111320*Math.cos(D.origin[1]*Math.PI/180),(lat-D.origin[1])*110574];
-const kmCell=(D,x,y)=>String.fromCharCode(65+Math.floor((x+D.W)/KM))+(Math.floor((y+D.H)/KM)+1);
 
 /* ---------- orthophotos ----------
    1956: Vuelo Americano Serie B, cut into our own tiles aligned to the map frame (scripts/ortho1956.py):
@@ -227,9 +225,10 @@ function MapView({D,layers,cases,onOpen,paused,pick,onPick,mark,children}){
     g.strokeStyle=col('--frame');g.lineWidth=1;g.strokeRect(sx(-W)+.5,sy(H)+.5,2*W*s,2*H*s);
     g.fillStyle=col('--mute');g.font='11px '+FONT;g.textBaseline='middle';
     const L=Math.max(4,sx(-W)-6);g.textAlign='right';
-    for(let k=1;k<=2*H/KM;k++){const Y=sy(-H+k*KM);if(Y<8||Y>b.height-8)continue;g.fillText(k+' km',L-6,Y)}
+    const nH=2*H/KM,nW=2*W/KM;   // axes: kilometres from the south-west corner, "km" only on the last label
+    for(let k=1;k<=nH;k++){const Y=sy(-H+k*KM);if(Y<8||Y>b.height-8)continue;g.fillText(k===nH?k+' km':''+k,L-6,Y)}
     g.textAlign='center';const B=Math.min(b.height-12,sy(-H)+16);
-    for(let c=0;c<2*W/KM;c++){const X=sx(-W+(c+.5)*KM);if(X>12&&X<b.width-12)g.fillText(String.fromCharCode(65+c),X,B)}
+    for(let c=1;c<=nW;c++){const X=sx(-W+c*KM);if(X>12&&X<b.width-12)g.fillText(c===nW?c+' km':''+c,X,B)}
     g.fillStyle=col('--ink');g.font='700 18px '+FONT;const T=sy(H)-18;if(T>14)g.fillText('N',sx(0),T);
     g.textAlign='left';g.textBaseline='alphabetic';g.font='700 15px '+FONT;const MY=sy(H)-8;if(MY>12)g.fillText('Madrid',Math.max(8,sx(-W)),MY)});
 
@@ -428,7 +427,7 @@ function Explore({D,cases,open,eq,onClose}){
         ${c.items.map((x,i)=>html`<button key=${i} class=${'row'+(c.id===sel.id&&i===sel.item?' sel':'')} onClick=${()=>setSel({id:c.id,item:i})}>${thumb(x)}<span>${itemName(x)}</span></button>`)}
       </section>`)}
       <div class="info"><button class="i" aria-expanded=${info} aria-label="Información" onClick=${()=>setInfo(o=>!o)}>i</button>
-        ${info&&html`<p>Arrastra para mover, rueda para acercar, ↑ ↓ para pasar de archivo, Esc para volver. En la lente, la ortofoto de 1956 (Vuelo Americano Serie B, 1956–57); de fondo, la de hoy (PNOA). © IGN, CC BY 4.0.</p>`}</div>
+        ${info&&html`<p>Arrastra y usa la rueda para moverte; ↑ ↓ cambian de archivo; Esc vuelve.<br/>Lente: vuelo de 1956–57. Fondo: PNOA, hoy. © IGN (CC BY 4.0)</p>`}</div>
     </aside></div>`}
 
 /* ---------- proposing a case ----------
@@ -483,14 +482,11 @@ function App(){
   if(!D)return html`<div class="load">Cargando el mapa…</div>`;
   const tog=k=>setLayers(l=>{const n={...l,[k]:!l[k]};if(k==='bw')localStorage.setItem('lnu-bw',n.bw?'1':'0');return n});
   const LAYERS=[['trees','Árboles','var(--tree)'],['buildings','Edificios','var(--b2)'],['green','Parques','var(--green)'],['water','Agua','var(--water)']];
-  const legend=st=>html`<div class="legend" onPointerDown=${e=>e.stopPropagation()} onPointerUp=${e=>e.stopPropagation()}>
-    <div class="row">${LAYERS.map(([k,l,sw])=>html`<button key=${k} class="ly" aria-pressed=${layers[k]} onClick=${()=>tog(k)}><i style=${{background:sw}}></i>${l}</button>`)}
-      <button class="ly bwt" aria-pressed=${layers.bw} title="Ortofotos y fotos en blanco y negro igualado" onClick=${()=>tog('bw')}>B/N</button>
-      <span class="sc">▢ ${fmtStep(st||KM)}</span>
-      <button class="i" aria-expanded=${info} aria-label="Información" onClick=${()=>setInfo(o=>!o)}>i</button></div>
-    ${info&&html`<p>Pasa por un cuadro para comparar 1956 y hoy; haz clic para fijarlo y otra vez para abrirlo.
-      Árboles (${D.n.toLocaleString('es-ES')}): Ayuntamiento de Madrid, 2026. Edificios: Catastro. Agua, parques y nombres: © OpenStreetMap.
-      Ortofotos: © IGN, Vuelo Americano 1956–57 y PNOA, CC BY 4.0.</p>`}</div>`;
+  const legend=html`<div class="legend" onPointerDown=${e=>e.stopPropagation()} onPointerUp=${e=>e.stopPropagation()}>
+    <div class="row">${LAYERS.map(([k,l,sw])=>html`<button key=${k} class="ly" aria-pressed=${layers[k]} title=${(layers[k]?'Ocultar ':'Mostrar ')+l.toLowerCase()} onClick=${()=>tog(k)}><i style=${{'--sw':sw}}></i>${l}</button>`)}
+      <button class="ly bwt" aria-pressed=${layers.bw} title="Fotos y ortofotos en blanco y negro" onClick=${()=>tog('bw')}><i></i>Fotos en b/n</button>
+      <button class="i" aria-expanded=${info} aria-label="Información y fuentes" onClick=${()=>setInfo(o=>!o)}>i</button></div>
+    ${info&&html`<p>Pasa por un cuadro: 1956 y hoy. Clic: fijarlo; otro clic: abrirlo.<br/>Datos: Ayto. de Madrid · Catastro · © OpenStreetMap · © IGN (CC BY 4.0)</p>`}</div>`;
   return html`<div class=${"app"+(layers.bw?" bw":"")}>
     <${MapView} D=${D} layers=${layers} cases=${cases} onOpen=${setOpen} paused=${!!open||proposing} pick=${proposing}
       onPick=${([x,y])=>setAt({x,y})} mark=${proposing&&at&&{...at,r:atR}}>${legend}<//>

@@ -166,10 +166,11 @@ button:hover{border-color:var(--frame)}button:focus-visible,input:focus-visible{
 /* legend: collapsed to one line by default */
 .legend{position:absolute;left:14px;bottom:14px;z-index:7;background:var(--card);border:1px solid var(--line);font-size:11px;max-width:calc(100% - 80px);padding:4px 6px}
 .legend .row{display:flex;align-items:center;gap:2px;flex-wrap:wrap}
-.legend .ly{display:flex;align-items:center;gap:5px;min-height:26px;padding:0 7px;border:0;background:none;font-size:11px;color:var(--mute)}
-.legend .ly i{width:9px;height:9px;flex:none;opacity:.35}.legend .ly[aria-pressed=true]{color:var(--ink)}.legend .ly[aria-pressed=true] i{opacity:1}
-.legend .bwt{border-left:1px solid var(--line);margin-left:4px;padding-left:10px}.legend .bwt[aria-pressed=true]{color:var(--bg);background:var(--ink)}
-.legend .sc{color:var(--mute);padding:0 8px 0 10px;border-left:1px solid var(--line);margin-left:4px;white-space:nowrap}
+.legend .ly{display:flex;align-items:center;gap:6px;min-height:26px;padding:0 7px;border:0;background:none;font-size:11px;color:var(--ink);opacity:.4;transition:opacity .15s}
+.legend .ly[aria-pressed=true]{opacity:1}
+.legend .ly i{width:9px;height:9px;flex:none;border:1.5px solid var(--sw);background:transparent}.legend .ly[aria-pressed=true] i{background:var(--sw)}
+.legend .bwt{border-left:1px solid var(--line);margin-left:4px;padding-left:10px}
+.legend .bwt i{--sw:var(--ink);border-radius:50%;background:linear-gradient(90deg,var(--ink) 50%,transparent 50%)!important}
 .legend p{margin:6px 2px 2px;max-width:420px;color:var(--mute);font-size:11px;line-height:1.5}
 .load{position:absolute;inset:0;display:grid;place-items:center;color:var(--mute);padding:20px;text-align:center}
 @media(max-width:700px){
