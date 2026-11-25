@@ -6,7 +6,7 @@
 'use strict';
 const {useState,useEffect,useLayoutEffect,useRef,useCallback}=React;
 const html=htm.bind(React.createElement);
-const KM=1000, STEPS=[1000,500,250,100,50], PHOTO_PX=110, ROTATE=8000;
+const KM=1000, STEPS=[1000,500,250,100,50], PHOTO_PX=110;
 const REDUCED=matchMedia('(prefers-reduced-motion: reduce)').matches;
 // grid refines as you zoom: the coarsest step whose square is no bigger than ~2 photo footprints
 const stepFor=s=>STEPS.find(st=>st*s<=PHOTO_PX*1.25)||STEPS[STEPS.length-1];
@@ -77,9 +77,6 @@ function Ortho({D,b,which,size,cls}){
    A case is one geolocated record: exact (a point) or approximate (a point and a radius r in metres), holding any number of items:
    versions {photos:[{src,label}...]} · photo {src,label} · text {body,label} · audio {src,label} · file {src,label}. Source: data/cases.json.
    Cases you add live in this browser (IndexedDB). */
-const KIND={versions:'photo',photo:'photo',text:'text',audio:'audio',file:'file'},NOUN={photo:['photo','photos'],text:['text','texts'],audio:['audio','audio'],file:['file','files']};
-const inventory=c=>{const k={};for(const it of c.items){const t=KIND[it.type];if(t)k[t]=(k[t]||0)+(it.type==='versions'?it.photos.length:1)}
-  return ['photo','audio','text','file'].filter(t=>k[t]).map(t=>k[t]+' '+NOUN[t][k[t]>1?1:0]).join(' · ')};
 const leadIndex=c=>{for(const t of ['versions','photo','audio','text','file']){const i=c.items.findIndex(it=>it.type===t);if(i>=0)return i}return 0};
 const catNo=c=>'Nº '+String(c.n).padStart(3,'0');
 const where=c=>c.loc==='estimate'?'estimated ±'+c.r+' m, to check':c.loc==='gps'?'from the photo\'s GPS':c.r?'approx. ±'+c.r+' m':'exact location';
@@ -140,16 +137,13 @@ function Sound({src,label,variant}){ // variant: 'dot' (play button only), 'mini
 const probe=document.createElement('i');probe.style.display='none';document.body.appendChild(probe);
 const col=n=>{probe.style.color=`var(${n})`;return getComputedStyle(probe).color};
 
-/* squares: every grid square (of the zoom's size) that holds at least one case. An approximate case sits in a square no smaller
-   than its uncertainty (the zoom's square doubled until it spans 2r), so zooming in never pins it down more than the archive can.
-   Returns {tiles: key -> square, of: case id -> key, cover: Set of zoom-size cells that some square covers}. */
+/* squares: every grid square (of the zoom's size) that holds at least one case. An approximate case is shown only while its
+   uncertainty (2r) fits in a square: zoomed in further, the archive cannot say which square it belongs to, so it is left out. */
 const tileOf=(D,B,x,y)=>[Math.floor((x+D.W)/B),Math.floor((y+D.H)/B)];
-function tilesFor(D,cases,B){const t={},of={},cover=new Set();
-  for(const c of Object.values(cases)){let S=B;while(S<2*c.r&&S<8000)S*=2;const [i,j]=tileOf(D,S,c.x,c.y),k=S+':'+i+','+j;of[c.id]=k;
-    (t[k]||(t[k]={key:k,x0:-D.W+i*S,y0:-D.H+j*S,size:S,ids:[]})).ids.push(c.id)}
-  for(const q of Object.values(t)){q.ids.sort((a,b)=>cases[a].n-cases[b].n);const n=q.size/B,[i0,j0]=tileOf(D,B,q.x0+1,q.y0+1);
-    for(let a=0;a<n;a++)for(let b=0;b<n;b++)cover.add((i0+a)+','+(j0+b))}
-  return {tiles:t,of,cover}}
+function tilesFor(D,cases,B){const t={};
+  for(const c of Object.values(cases)){if(2*c.r>B)continue;const [i,j]=tileOf(D,B,c.x,c.y),k=i+','+j;
+    (t[k]||(t[k]={key:k,x0:-D.W+i*B,y0:-D.H+j*B,size:B,ids:[]})).ids.push(c.id)}
+  for(const q of Object.values(t))q.ids.sort((a,b)=>cases[a].n-cases[b].n);return t}
 const hash=s=>{let h=2166136261;for(let i=0;i<s.length;i++)h=Math.imul(h^s.charCodeAt(i),16777619);return (h>>>0)/4294967296};
 /* ---------- laying out cards ----------
    A card takes w x h grid squares chosen from its content, inset by a small gutter. Each is packed near its anchor square,
@@ -166,7 +160,7 @@ function shapes(it,big){
   if(it.type==='audio')return [[2,1],[1,1]];
   return [[1,1]]}
 const GUT=5;
-// ctx: {U (square side, m), ox,oy (grid origin, m), v, bw,bh, avoid, blocked(i,j), reach, occ:Set, dirs:Map, air (keep a square free around each card)}
+// ctx: {U (square side, m), ox,oy (grid origin, m), v, bw,bh, avoid, blocked(i,j), reach, occ:Set, dirs:Map}
 function packOne(L,ctx){const {U,ox,oy,v,bw,bh,avoid,blocked,reach,occ,dirs}=ctx;
   for(const [w,h] of L.shapes){let best=null;
     for(let i=L.ai-reach-w+1;i<=L.ai+reach;i++)for(let j=L.aj-reach-h+1;j<=L.aj+reach;j++){
@@ -177,23 +171,19 @@ function packOne(L,ctx){const {U,ox,oy,v,bw,bh,avoid,blocked,reach,occ,dirs}=ctx
       const cx=i+w/2-(L.ai+.5),cy=j+h/2-(L.aj+.5),oct=(Math.round(Math.atan2(cy,cx)/(Math.PI/4))+8)%8;
       const sc=Math.hypot(cx,cy)+1.1*(dirs.get(L.anchorKey+oct)||0)+.6*hash(L.key+'|'+i+','+j);
       if(!best||sc<best.sc)best={sc,i,j,w,h,left,top,W,H,oct}}
-    if(best){const m=ctx.air?1:0;for(let a=-m;a<best.w+m;a++)for(let b=-m;b<best.h+m;b++)occ.add((best.i+a)+','+(best.j+b));
+    if(best){for(let a=0;a<best.w;a++)for(let b=0;b<best.h;b++)occ.add((best.i+a)+','+(best.j+b));
       dirs.set(L.anchorKey+best.oct,(dirs.get(L.anchorKey+best.oct)||0)+1);return {...L,...best}}}
   return null}
 // the hairline from a card to a point (screen px): it leaves the card at the edge point nearest to it
 const leaderTo=(r,px,py)=>[Math.min(r.left+r.W,Math.max(r.left,px)),Math.min(r.top+r.H,Math.max(r.top,py)),px,py];
-// ... or to the nearest edge of its square
-const leader=(r,T)=>{const cx=r.left+r.W/2,cy=r.top+r.H/2,px=Math.min(T.left+T.width,Math.max(T.left,cx)),py=Math.min(T.top+T.height,Math.max(T.top,cy));
-  return [Math.min(r.left+r.W,Math.max(r.left,px)),Math.min(r.top+r.H,Math.max(r.top,py)),px,py]};
 
 /* ---------- map ---------- */
-function MapView({D,layers,cases,placing,onPlace,onOpen,paused,shuffle,children}){
+function MapView({D,layers,cases,placing,onPlace,onOpen,paused,children}){
   const box=useRef(),cv=useRef(),under=useRef(),over=useRef(),view=useRef(null),[tick,setTick]=useState(0),[hover,setHover]=useState(null),[wipe,setWipe]=useState(.5),[intro,setIntro]=useState(false),drag=useRef(null),[ptr,setPtr]=useState(null);
   const [pin,setPin]=useState(null),[page,setPage]=useState(0),entering=useRef(false),lastW=useRef(.5),anim=useRef();
-  const [cards,setCards]=useState([]),[lit,setLit]=useState(null),recent=useRef([]),unplaced=useRef([]),noRoom=useRef({tick:-1,ids:new Set()}),avoid=useRef({s:'',a:[]});
+  const [lit,setLit]=useState(null),avoid=useRef({s:'',a:[]});
   /* The base map is expensive to draw (every building), so it is drawn only once the view settles: while panning or zooming,
-     the last drawing is moved and scaled with a CSS transform. Moves are batched to one per frame, and the sample cards
-     step aside while the map moves and return after a pause. */
+     the last drawing is moved and scaled with a CSS transform. Moves are batched to one per frame. */
   const [drawTick,setDrawTick]=useState(0),[moving,setMoving]=useState(false),drawn=useRef(null),raf=useRef(0),settle=useRef();
   const kick=()=>{if(!raf.current)raf.current=requestAnimationFrame(()=>{raf.current=0;setTick(t=>t+1)});
     setMoving(true);clearTimeout(settle.current);settle.current=setTimeout(()=>setMoving(false),650)};
@@ -243,12 +233,11 @@ function MapView({D,layers,cases,placing,onPlace,onOpen,paused,shuffle,children}
     for(let c=0;c<2*W/KM;c++){const X=sx(-W+(c+.5)*KM);if(X>12&&X<b.width-12)g.fillText(String.fromCharCode(65+c),X,B)}
     g.fillStyle=col('--ink');g.font='600 18px "Instrument Sans",system-ui,sans-serif';const T=sy(H)-18;if(T>14)g.fillText('N',sx(0),T)});
 
-  const v=view.current,G=v&&gridFor(v.s),{tiles,of:tileOfCase,cover}=v?tilesFor(D,cases,G.B):{tiles:{},of:{},cover:new Set()};
-  const bySize=Object.values(tiles).sort((a,b)=>b.size-a.size); // big (uncertain) squares under small ones
+  const v=view.current,G=v&&gridFor(v.s),tiles=v?tilesFor(D,cases,G.B):{};
   const toM=e=>{const b=box.current.getBoundingClientRect(),v=view.current;return [(e.clientX-b.left-v.tx)/v.s,(v.ty-(e.clientY-b.top))/v.s]};
   const inFrame=([x,y])=>Math.abs(x)<=D.W&&Math.abs(y)<=D.H;
   const inside=(T,[x,y])=>x>=T.x0&&x<T.x0+T.size&&y>=T.y0&&y<T.y0+T.size;
-  const hit=e=>{if(!layers.cases)return null;const m=toM(e);return bySize.filter(k=>inside(k,m)).pop()||null}; // the smallest square under the pointer
+  const hit=e=>{if(!layers.cases)return null;const m=toM(e);return Object.values(tiles).find(k=>inside(k,m))||null};
   const rect=k=>({left:v.tx+k.x0*v.s,top:v.ty-(k.y0+k.size)*v.s,width:k.size*v.s,height:k.size*v.s});
   const zoomAt=(px,py,f)=>{const v=view.current,ns=Math.min(v.max,Math.max(v.min,v.s*f)),k=ns/v.s;v.tx=px-(px-v.tx)*k;v.ty=py-(py-v.ty)*k;v.s=ns;kick()};
   useEffect(()=>{const el=box.current,h=e=>{if(e.target.closest('.legend'))return;e.preventDefault();cancelAnimationFrame(anim.current);const b=el.getBoundingClientRect();zoomAt(e.clientX-b.left,e.clientY-b.top,Math.exp(-e.deltaY*.0015))};el.addEventListener('wheel',h,{passive:false});return()=>el.removeEventListener('wheel',h)},[]);
@@ -263,32 +252,10 @@ function MapView({D,layers,cases,placing,onPlace,onOpen,paused,shuffle,children}
     const b=box.current.getBoundingClientRect(),v=view.current;glide({tx:b.width/2-(g.x0+g.size/2)*v.s,ty:b.height/2+(g.y0+g.size/2)*v.s})};
   const openTile=(T,id,item,from)=>onOpen({tile:{x0:T.x0,y0:T.y0,size:T.size,ids:T.ids},id:id||(T.ids.length===1?T.ids[0]:null),item:item==null?null:item,from:from||rect(T)});
   const openItem=(id,item,el)=>{const c=cases[id];if(!c)return;let T=pin&&pin.ids.includes(id)?pin:null;
-    if(!T)T=tiles[tileOfCase[id]];if(!T)return;
+    if(!T){const [i,j]=tileOf(D,G.B,c.x,c.y);T=tiles[i+','+j]}if(!T)return;
     const bb=box.current.getBoundingClientRect(),r=el.getBoundingClientRect();setLit(null);
     openTile(T,id,item==null?leadIndex(c):item,{left:r.left-bb.left,top:r.top-bb.top,width:r.width,height:r.height})};
 
-  /* ---- idle: a few cards drawn from the archive, filed near their squares ---- */
-  const wanted=()=>{const w=box.current.getBoundingClientRect().width;return w<640?1:w<1100?2:3};
-  const inView=()=>{const v=view.current,b=box.current.getBoundingClientRect();
-    return Object.values(cases).filter(c=>{const X=v.tx+c.x*v.s,Y=v.ty-c.y*v.s;return X>24&&X<b.width-24&&Y>24&&Y<b.height-24}).map(c=>c.id)};
-  const cardKey=cards.map(c=>c.id+(c.out?'~':'')).join();
-  useEffect(()=>{ // keep a few cards for cases in view: drop those that left (or found no room), draw new ones at random
-    if(!view.current||drag.current||moving)return;
-    if(!layers.cards){if(cards.length)setCards([]);return}
-    if(noRoom.current.tick!==tick)noRoom.current={tick,ids:new Set()};for(const id of unplaced.current)noRoom.current.ids.add(id);
-    const vis=new Set(inView()),K=wanted(),bad=noRoom.current.ids;
-    setCards(cs=>{let n=cs.filter(c=>vis.has(c.id)&&!(bad.has(c.id)&&!c.out));const have=new Set(n.map(c=>c.id));
-      const pool=[...vis].filter(id=>!have.has(id)&&!bad.has(id)),fresh=pool.filter(id=>!recent.current.includes(id)),src=fresh.length?fresh:pool;
-      let k=0;while(n.filter(c=>!c.out).length<K&&src.length){const id=src.splice(Math.floor(Math.random()*src.length),1)[0];n=[...n,{id,t:Date.now(),d:k++*.18}]}
-      while(n.filter(c=>!c.out).length>K){const i=n.findIndex(c=>!c.out);n=n.filter((_,j)=>j!==i)}
-      return n.map(c=>c.id).join()===cs.map(c=>c.id).join()?cs:n});
-  },[tick,cases,layers.cards,cardKey,moving]);
-  const retire=all=>{setCards(cs=>{const live=cs.filter(c=>!c.out);if(!live.length)return cs;const go=all?live:[live.reduce((a,b)=>a.t<b.t?a:b)];
-      recent.current=[...go.map(c=>c.id),...recent.current].slice(0,8);return cs.map(c=>go.includes(c)?{...c,out:true}:c)});
-    setTimeout(()=>setCards(cs=>cs.filter(c=>!c.out)),520)};
-  const hold=useRef();hold.current=paused||focus||lit||moving||drag.current||(playing&&!playing.paused);
-  useEffect(()=>{if(!layers.cards||REDUCED)return;const iv=setInterval(()=>{if(!document.hidden&&!hold.current)retire(false)},ROTATE);return()=>clearInterval(iv)},[layers.cards]);
-  useEffect(()=>{if(shuffle)retire(true)},[shuffle]);
   // the controls: cards keep clear of them (re-measured after each render, re-laid out if they moved)
   useLayoutEffect(()=>{const bb=box.current.getBoundingClientRect();
     const a=[...box.current.querySelectorAll('.legend,.tools,.title')].map(el=>{const r=el.getBoundingClientRect();return {left:r.left-bb.left,top:r.top-bb.top,right:r.right-bb.left,bottom:r.bottom-bb.top}});
@@ -300,23 +267,16 @@ function MapView({D,layers,cases,placing,onPlace,onOpen,paused,shuffle,children}
 
   /* ---- layout ---- */
   const bsz=v&&box.current.getBoundingClientRect(),base=v&&{v,bw:bsz.width,bh:bsz.height,avoid:avoid.current.a};
-  const idle=[];
-  if(v&&layers.cards&&!moving){const B=G.B,ctx={...base,U:B,ox:-D.W,oy:-D.H,occ:new Set(),dirs:new Map(),air:true,reach:3,
-      blocked:(i,j)=>cover.has(i+','+j)||i<0||j<0||(i+1)*B>2*D.W||(j+1)*B>2*D.H};
-    for(const cd of cards){const c=cases[cd.id];if(!c)continue;const [ai,aj]=tileOf(D,B,c.x,c.y),li=leadIndex(c);
-      const r=packOne({key:cd.id,ai,aj,anchorKey:cd.id,shapes:shapes(c.items[li],false),id:c.id,item:li},ctx);
-      if(r)idle.push({...r,cd,T:tiles[tileOfCase[c.id]]})}}
-  if(!moving)unplaced.current=cards.filter(c=>!c.out&&!idle.some(r=>r.id===c.id)).map(c=>c.id);
-  // focus: the hovered square shows up to three of its files; the pinned one all of them, a page at a time, a square of air around it
+  // a pinned square lays out all its files around it, a page at a time, a square of air around it and never outside the frame
   let plot=[],pages=1,pg=0;
-  if(v&&F){const all=[];const cs=F.ids.map(id=>cases[id]).filter(Boolean),li=cs.map(leadIndex);
+  if(v&&pin){const F=pin,all=[];const cs=F.ids.map(id=>cases[id]).filter(Boolean),li=cs.map(leadIndex);
     cs.forEach((c,k)=>all.push([c.id,li[k]]));cs.forEach((c,k)=>c.items.forEach((_,i)=>{if(i!==li[k])all.push([c.id,i])}));
-    const run=(st,max,big)=>{const ctx={...base,U:F.size,ox:F.x0,oy:F.y0,occ:new Set(),dirs:new Map(),reach:4,blocked:(i,j)=>Math.abs(i)<=1&&Math.abs(j)<=1},out=[];
+    const U=F.size,outside=(i,j)=>F.x0+i*U< -D.W||F.x0+(i+1)*U>D.W||F.y0+j*U< -D.H||F.y0+(j+1)*U>D.H;
+    const run=(st,max,big)=>{const ctx={...base,U,ox:F.x0,oy:F.y0,occ:new Set(),dirs:new Map(),reach:4,blocked:(i,j)=>Math.abs(i)<=1&&Math.abs(j)<=1||outside(i,j)},out=[];
       for(let k=st;k<all.length&&out.length<max;k++){const [id,ii]=all[k],key='f'+id+'.'+ii;
         const r=packOne({key,ai:0,aj:0,anchorKey:'',shapes:shapes(cases[id].items[ii],big&&(!out.length||hash(key)<.3)),id,item:ii},ctx);if(!r)break;out.push(r)}return out};
-    if(pin){const P=[];for(let st=0;st<all.length&&P.length<40;){const o=run(st,99,true);P.push(o);st+=Math.max(1,o.length)}
-      pages=Math.max(1,P.length);pg=((page%pages)+pages)%pages;plot=P[pg]||[]}
-    else plot=run(0,3,false)}
+    const P=[];for(let st=0;st<all.length&&P.length<40;){const o=run(st,99,true);P.push(o);st+=Math.max(1,o.length)}
+    pages=Math.max(1,P.length);pg=((page%pages)+pages)%pages;plot=P[pg]||[]}
 
   /* ---- pointer ---- */
   const down=e=>{if(e.target.closest&&e.target.closest('.pager'))return;const cd=e.target.closest&&e.target.closest('.card');box.current.setPointerCapture(e.pointerId);cancelAnimationFrame(anim.current);
@@ -361,15 +321,13 @@ function MapView({D,layers,cases,placing,onPlace,onOpen,paused,shuffle,children}
       onPointerLeave=${()=>{setHover(null);setPtr(null)}} onDragOver=${e=>e.preventDefault()} onDrop=${drop}>
     <canvas ref=${under} class="under"></canvas><canvas ref=${cv}></canvas><canvas ref=${over} class="over"></canvas>
     <div class="title"><b>Madrid</b> · arbolado 2026</div>
-    ${v&&layers.cases&&bySize.filter(g=>!(pin&&g.x0<pin.x0+pin.size&&g.x0+g.size>pin.x0&&g.y0<pin.y0+pin.size&&g.y0+g.size>pin.y0)).map(g=>tileEl(g,!pin&&hover===g.key,false))}
+    ${v&&layers.cases&&Object.values(tiles).filter(g=>!(pin&&g.x0<pin.x0+pin.size&&g.x0+g.size>pin.x0&&g.y0<pin.y0+pin.size&&g.y0+g.size>pin.y0)).map(g=>tileEl(g,!pin&&hover===g.key,false))}
     ${v&&pin&&tileEl(pin,true,true)}
     ${v&&html`<svg class="leads" aria-hidden="true">
-      ${idle.map(r=>{const [x1,y1,x2,y2]=leader(r,rect(r.T));return html`<g key=${r.key} class=${'idle'+(r.cd.out?' out':'')+(lit===r.key?' lit':'')} style=${{'--d':r.cd.d+'s'}}><line pathLength="1" x1=${x1} y1=${y1} x2=${x2} y2=${y2}/></g>`})}
-      ${plot.map((r,k)=>{const c=cases[r.id],[x1,y1,x2,y2]=leaderTo(r,v.tx+c.x*v.s,v.ty-c.y*v.s);return html`<g key=${(pin?'p':'h')+r.key} class=${lit===(pin?'p':'h')+r.key?'lit':''} style=${{'--d':(pin?.25:.12)+k*.07+'s'}}><line pathLength="1" x1=${x1} y1=${y1} x2=${x2} y2=${y2}/></g>`})}
-      ${F&&F.ids.map(id=>{const c=cases[id];if(!c)return null;const on=lit&&lit.slice(1).startsWith('f'+id+'.'),X=v.tx+c.x*v.s,Y=v.ty-c.y*v.s;
+      ${plot.map((r,k)=>{const c=cases[r.id],[x1,y1,x2,y2]=leaderTo(r,v.tx+c.x*v.s,v.ty-c.y*v.s);return html`<g key=${'p'+r.key} class=${lit==='p'+r.key?'lit':''} style=${{'--d':.25+k*.07+'s'}}><line pathLength="1" x1=${x1} y1=${y1} x2=${x2} y2=${y2}/></g>`})}
+      ${pin&&pin.ids.map(id=>{const c=cases[id];if(!c)return null;const on=lit&&lit.slice(1).startsWith('f'+id+'.'),X=v.tx+c.x*v.s,Y=v.ty-c.y*v.s;
         return html`<g key=${'d'+id}>${c.r>0&&html`<circle class="unc" cx=${X} cy=${Y} r=${c.r*v.s}/>`}<circle class=${'dot'+(on?' lit':'')} cx=${X} cy=${Y} r="3.5"/></g>`})}</svg>`}
-    ${idle.map(r=>cardEl(r,'idle'+(r.cd.out?' out':''),r.cd.d,inventory(cases[r.id])))}
-    ${plot.map((r,k)=>cardEl({...r,key:(pin?'p':'h')+r.key},'',(pin?.25:.12)+k*.07,itemName(cases[r.id].items[r.item]),r.item))}
+    ${plot.map((r,k)=>cardEl({...r,key:'p'+r.key},'',.25+k*.07,itemName(cases[r.id].items[r.item]),r.item))}
     ${pin&&pages>1&&html`<div class="pager" style=${{left:FR.left+FR.width/2,top:FR.top+FR.height+12}} onPointerDown=${e=>e.stopPropagation()} onPointerUp=${e=>e.stopPropagation()}>
       <button aria-label="Previous files" onClick=${()=>setPage(p=>p-1)}>‹</button><span>${pg+1} / ${pages}</span><button aria-label="Next files" onClick=${()=>setPage(p=>p+1)}>›</button></div>`}
     ${v&&placing&&ptr&&(()=>{const [i,j]=tileOf(D,G.B,ptr[0],ptr[1]);return html`<div class="hint" style=${rect({x0:-D.W+i*G.B,y0:-D.H+j*G.B,size:G.B})}></div>`})()}
@@ -479,8 +437,8 @@ function Explore({D,cases,open,eq,onClose,onAdd,onRemove}){
     </aside></div>`}
 
 function App(){
-  const [D,setD]=useState(null),[err,setErr]=useState(null),[layers,setLayers]=useState(()=>({buildings:true,trees:false,water:true,green:true,cases:true,cards:true,ortho:false,bw:localStorage.getItem('lnu-bw')==='1'}));
-  const [cases,setCases]=useState({}),[placing,setPlacing]=useState(false),[open,setOpen]=useState(null),[legendOpen,setLegendOpen]=useState(false),[shuffle,setShuffle]=useState(0);
+  const [D,setD]=useState(null),[err,setErr]=useState(null),[layers,setLayers]=useState(()=>({buildings:true,trees:false,water:true,green:true,cases:true,ortho:false,bw:localStorage.getItem('lnu-bw')==='1'}));
+  const [cases,setCases]=useState({}),[placing,setPlacing]=useState(false),[open,setOpen]=useState(null),[legendOpen,setLegendOpen]=useState(false);
   const file=useRef(),target=useRef(null),[,setAsp]=useState(0);
   useEffect(()=>preloadAspects(cases,()=>setAsp(x=>x+1)),[cases]); // photo shapes decide card shapes
   useEffect(()=>{Promise.all([loadData(),fetch('data/cases.json').then(r=>r.ok?r.json():{cases:[]}).catch(()=>({cases:[]})),dbAll()]).then(([d,cj,mine])=>{
@@ -504,8 +462,6 @@ function App(){
       <button class="bwt" aria-pressed=${layers.bw} title="Everything in black and white, tone-matched: the map, today's orthophoto (to 1956) and the photos" onClick=${()=>tog('bw')}>◐ B/W</button></div>
     ${legendOpen&&html`<div class="body">
       ${LAYERS.map(([k,l,sw])=>html`<label key=${k}><input type="checkbox" checked=${layers[k]} onChange=${()=>tog(k)}/>${l}<i class="sw" style=${{background:sw,border:k==='cases'?'1.25px solid var(--ink)':0}}></i></label>`)}
-      <label><input type="checkbox" checked=${layers.cards} onChange=${()=>tog('cards')}/>Cards from the archive</label>
-      ${layers.cards&&html`<button class="add" onClick=${()=>setShuffle(s=>s+1)}>Draw other cards</button>`}
       <label><input type="checkbox" checked=${layers.ortho} onChange=${()=>tog('ortho')}/>Orthophotos in every square<i class="sw" style=${{background:'linear-gradient(90deg,#7f9a6e 50%,#9a9a96 50%)'}}></i></label>
       <hr/>
       <button class="add" aria-pressed=${placing} onClick=${()=>setPlacing(p=>!p)}>${placing?'Cancel':'Add a case'}</button>
@@ -513,7 +469,7 @@ function App(){
       <p>${D.n.toLocaleString('es-ES')} trees: Ayuntamiento de Madrid, 2026. Buildings: Catastro, 2026. Water and place names: © OpenStreetMap. Orthophotos: © IGN (Vuelo Americano 1956–57, PNOA). Cases you add stay in this browser.</p>
     </div>`}</div>`;
   return html`<div class=${"app"+(layers.bw?" bw":"")}>
-    <${MapView} D=${D} layers=${layers} cases=${cases} placing=${placing} onPlace=${place} onOpen=${setOpen} paused=${!!open} shuffle=${shuffle}>${legend}<//>
+    <${MapView} D=${D} layers=${layers} cases=${cases} placing=${placing} onPlace=${place} onOpen=${setOpen} paused=${!!open}>${legend}<//>
     ${open&&html`<${Explore} key=${open.tile.x0+','+open.tile.y0} D=${D} cases=${cases} open=${open} eq=${layers.bw} onClose=${()=>setOpen(null)}
       onAdd=${id=>place({id},null)} onRemove=${remove}/>`}
     <input type="file" accept="image/*" ref=${file} onChange=${e=>{const f=e.target.files[0],t=target.current;if(f&&t)place(t,f);e.target.value=''}}/>
