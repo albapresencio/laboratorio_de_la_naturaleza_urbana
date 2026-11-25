@@ -18,8 +18,9 @@ body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.45 "Instrument S
 .map{position:relative;height:100%;overflow:hidden;cursor:grab;touch-action:none;user-select:none}
 .map.drag{cursor:grabbing}.map.placing{cursor:copy}.map.over{cursor:pointer}
 .map>canvas{position:absolute;inset:0;width:100%;height:100%;transform-origin:0 0}.map>canvas.under,.map>canvas.over{transform:none!important;pointer-events:none}
-/* outside the frame: paper, a generated grain (paper.jpg: 1024 px shown at 512, so it stays sharp) multiplied onto a warm tint of the ground */
-.map{background:color-mix(in srgb,var(--bg) 93%,#d9cfbd) url(paper.jpg) 0 0/512px 512px;background-blend-mode:multiply}
+/* outside the frame: paper, a generated stipple over domain-warped marble shapes (paper.jpg: 2048 px shown at 1024, so the dots
+   stay sharp), multiplied onto a warm tint of the ground */
+.map{background:color-mix(in srgb,var(--bg) 93%,#d9cfbd) url(paper.jpg) 0 0/1024px 1024px;background-blend-mode:multiply}
 :root[data-theme=dark] .map{background-blend-mode:soft-light}
 @media(prefers-color-scheme:dark){:root:not([data-theme=light]) .map{background-blend-mode:soft-light}}
 .title{position:absolute;left:16px;top:12px;font-size:13px;color:var(--mute);pointer-events:none}.title b{color:var(--ink);font-weight:600}
