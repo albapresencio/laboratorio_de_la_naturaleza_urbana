@@ -218,6 +218,7 @@ function MapView({D,layers,cases,placing,onPlace,onOpen,paused,children}){
      under it, the frame's ground (the paper texture shows outside); over it, the grid, the frame and its labels. */
   useLayoutEffect(()=>{const v=view.current;if(!v)return;const b=box.current.getBoundingClientRect(),dpr=devicePixelRatio||1,{s,tx,ty}=v,W=D.W,H=D.H,sx=x=>tx+x*s,sy=y=>ty-y*s;
     const prep=c=>{const w=Math.round(b.width*dpr),h=Math.round(b.height*dpr);if(c.width!==w)c.width=w;if(c.height!==h)c.height=h;const g=c.getContext('2d');g.setTransform(dpr,0,0,dpr,0,0);g.clearRect(0,0,b.width,b.height);return g};
+    box.current.style.backgroundPosition=`${tx}px ${ty}px`; // the paper outside the frame moves with the map
     let g=prep(under.current);g.fillStyle=col('--bg');g.fillRect(sx(-W),sy(H),2*W*s,2*H*s);
     g=prep(over.current);g.save();g.beginPath();g.rect(sx(-W),sy(H),2*W*s,2*H*s);g.clip();
     const line=(stp,css)=>{g.strokeStyle=col(css);g.lineWidth=1;g.beginPath();   // grid: fine steps light, kilometres stronger
