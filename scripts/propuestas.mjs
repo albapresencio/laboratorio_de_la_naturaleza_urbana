@@ -1,4 +1,4 @@
-/* The queue of proposed cases (sent from the map's "Proponer un caso" form, stored in Vercel Blob).
+/* The queue of proposed cases (sent from the map's "Añadir al archivo" form, stored in Vercel Blob).
 
    usage: node scripts/propuestas.mjs                  list pending proposals
           node scripts/propuestas.mjs importar <id>    download one into db/propuestas/<id>/ (caso.json + photos)

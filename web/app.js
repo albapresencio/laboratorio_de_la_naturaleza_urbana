@@ -451,9 +451,9 @@ function Propose({D,at,setR,onClose}){
     try{const r=await fetch('api/proponer',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({...f,lat,lon,radio:aprox?radio:0,fotos})});
       const j=await r.json().catch(()=>({}));if(!r.ok)throw new Error(j.error||'Error '+r.status);setState({done:true})}
     catch(err){setState({error:err.message||'No se pudo enviar.'})}};
-  if(state&&state.done)return html`<aside class="propose"><h2>Gracias</h2><p>Hemos recibido la propuesta. El equipo la revisará antes de añadirla al mapa.</p><button onClick=${onClose}>Cerrar</button></aside>`;
+  if(state&&state.done)return html`<aside class="propose"><h2>Gracias</h2><p>Hemos recibido tu aportación. El equipo la revisará antes de añadirla al mapa.</p><button onClick=${onClose}>Cerrar</button></aside>`;
   return html`<form class="propose" onSubmit=${send} onPointerDown=${e=>e.stopPropagation()}>
-    <header><h2>Proponer un caso</h2><button type="button" class="close" aria-label="Cerrar" onClick=${onClose}>×</button></header>
+    <header><h2>Añadir al archivo</h2><button type="button" class="close" aria-label="Cerrar" onClick=${onClose}>×</button></header>
     <p class="step">${at?'Ubicación marcada. Haz clic en otro punto para moverla.':'Haz clic en el mapa donde se tomó la foto.'}</p>
     <label>Título<input required maxlength="140" value=${f.titulo} onInput=${set('titulo')} placeholder="Lugar o calle"/></label>
     <label>Año o fecha<input maxlength="40" value=${f.fecha} onInput=${set('fecha')} placeholder="1960, años 70…"/></label>
@@ -469,7 +469,7 @@ function Propose({D,at,setR,onClose}){
     <input class="hp" tabIndex="-1" autoComplete="off" aria-hidden="true" value=${f.web} onInput=${set('web')} name="web"/>
     ${state&&state.error&&html`<p class="err">${state.error}</p>`}
     <button type="submit" class="send" disabled=${state&&state.sending}>${state&&state.sending?'Enviando…':'Enviar'}</button>
-    <p class="note">Las propuestas se revisan antes de publicarse. No compartas fotos sin permiso.</p></form>`}
+    <p class="note">El equipo revisa cada aportación antes de publicarla. No compartas fotos sin permiso.</p></form>`}
 
 function App(){
   const [D,setD]=useState(null),[err,setErr]=useState(null),[layers,setLayers]=useState(()=>({buildings:true,trees:true,water:true,green:true,bw:localStorage.getItem('lnu-bw')==='1'}));
@@ -494,7 +494,7 @@ function App(){
   return html`<div class=${"app"+(layers.bw?" bw":"")}>
     <${MapView} D=${D} layers=${layers} cases=${cases} onOpen=${setOpen} paused=${!!open||proposing} pick=${proposing}
       onPick=${([x,y])=>setAt({x,y})} mark=${proposing&&at&&{...at,r:atR}}>${legend}<//>
-    ${!proposing&&html`<button class="propbtn" onClick=${()=>{setAt(null);setProposing(true)}}>Proponer un caso</button>`}
+    ${!proposing&&html`<button class="propbtn" onClick=${()=>{setAt(null);setProposing(true)}}>Añadir al archivo</button>`}
     ${proposing&&html`<${Propose} D=${D} at=${at} setR=${setAtR} onClose=${()=>{setProposing(false);setAt(null)}}/>`}
     ${open&&html`<${Explore} key=${open.tile.x0+','+open.tile.y0} D=${D} cases=${cases} open=${open} eq=${layers.bw} onClose=${()=>setOpen(null)}/>`}
   </div>`;

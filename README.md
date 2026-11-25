@@ -19,7 +19,7 @@ web/                   the site (static, no build step): index.html, app.js, app
   media/               generated from db/fotografias
   tiles/1956/          1956 orthophoto tile pyramid
 scripts/               data pipeline (Python) and the proposal review tools
-api/proponer.js        Vercel Function behind the map's "Proponer un caso" form
+api/proponer.js        Vercel Function behind the map's "Añadir al archivo" form
 palettes/              palette lab: the same map crop drawn in candidate palettes
 ```
 
@@ -62,7 +62,7 @@ Web copies of the photos are scaled to 2000 px and stripped of metadata, includi
 
 ## Proposals from visitors
 
-The map's **Proponer un caso** button lets anyone mark a place, describe it and attach up to four photos. The photos
+The map's **Añadir al archivo** button lets anyone mark a place, describe it and attach up to four photos. The photos
 are shrunk in the browser and sent to `api/proponer.js`, which queues them in Vercel Blob under `propuestas/<id>/`
 (random, unguessable file names; no contact details are collected). Nothing reaches the map until the team adds it:
 
